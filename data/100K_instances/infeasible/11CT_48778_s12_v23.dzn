@@ -1,0 +1,28 @@
+% demand
+num_movements = 23;
+loading_factor = [1950, 1300, 850, 1800, 1250, 1750, 1150, 1550, 1100, 1800, 1350, 800, 1800, 1250, 1050, 1850, 1000, 1450, 1950, 900, 1100, 2000, 1600];
+pickup_time = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 6, 6, 6, 10, 10, 10, 10, 10, 10];
+delivery_time = [1, 1, 1, 2, 2, 9, 4, 2, 10, 4, 10, 9, 8, 5, 9, 11, 10, 11, 11, 11, 11, 11, 11];
+
+% transporter definition
+total_capacity = 11000;
+num_decks = 4;
+capacity = [3000, 3000, 1000, 4000];
+
+% ways out of decks
+num_ways_out = 2;
+paths_out = array3d(decks, ways_out, decks, [
+% ways out of deck d1
+2, 4, 0, 0, 3, 4, 0, 0, 
+
+% ways out of deck d2
+4, 0, 0, 0, 0, 0, 0, 0,	
+
+% ways out of deck d3
+4, 0, 0, 0, 0, 0, 0, 0,	
+
+% ways out of deck d4
+0, 0, 0, 0,	0, 0, 0, 0,	
+
+]);
+

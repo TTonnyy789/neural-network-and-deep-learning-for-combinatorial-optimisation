@@ -1,0 +1,392 @@
+{
+    "route": [
+        {
+            "load": [
+                "v1",
+                "v2",
+                "v3",
+                "v4",
+                "v5",
+                "v6",
+                "v7",
+                "v8",
+                "v9"
+            ]
+        },
+        {
+            "unload": [
+                "v3",
+                "v4",
+                "v2",
+                "v6",
+                "v8",
+                "v5"
+            ],
+            "load": [
+                "v10",
+                "v11",
+                "v12",
+                "v13",
+                "v14"
+            ]
+        },
+        {
+            "unload": [
+                "v13",
+                "v9",
+                "v14"
+            ],
+            "load": [
+                "v15",
+                "v16",
+                "v17"
+            ]
+        },
+        {
+            "unload": [
+                "v1"
+            ],
+            "load": [
+                "v18"
+            ]
+        },
+        {
+            "unload": [
+                "v11",
+                "v17",
+                "v15",
+                "v10"
+            ],
+            "load": [
+                "v19",
+                "v20",
+                "v21",
+                "v22"
+            ]
+        },
+        {
+            "unload": [
+                "v16",
+                "v12",
+                "v21",
+                "v19",
+                "v20",
+                "v22",
+                "v7",
+                "v18"
+            ],
+            "load": [
+                "v23",
+                "v24",
+                "v25",
+                "v26",
+                "v27",
+                "v28",
+                "v29",
+                "v30"
+            ]
+        },
+        {
+            "unload": [
+                "v23",
+                "v24",
+                "v26",
+                "v30",
+                "v27",
+                "v25",
+                "v29",
+                "v28"
+            ],
+            "load": [
+                "v31",
+                "v32",
+                "v33",
+                "v34"
+            ]
+        },
+        {
+            "unload": [
+                "v32",
+                "v31",
+                "v34"
+            ]
+        },
+        {
+            "unload": [
+                "v33"
+            ],
+            "load": [
+                "v35",
+                "v36",
+                "v37",
+                "v38",
+                "v39",
+                "v40"
+            ]
+        },
+        {
+            "load": [
+                "v41"
+            ]
+        },
+        {
+            "load": []
+        },
+        {
+            "unload": [
+                "v41",
+                "v38",
+                "v36",
+                "v35",
+                "v40",
+                "v39",
+                "v37"
+            ],
+            "load": [
+                "v42",
+                "v43",
+                "v44",
+                "v45"
+            ]
+        },
+        {
+            "unload": [
+                "v45",
+                "v42",
+                "v43",
+                "v44"
+            ],
+            "load": [
+                "v46",
+                "v47",
+                "v48",
+                "v49",
+                "v50",
+                "v51"
+            ]
+        },
+        {
+            "unload": [
+                "v50",
+                "v48",
+                "v46",
+                "v49"
+            ],
+            "load": [
+                "v52",
+                "v53",
+                "v54"
+            ]
+        },
+        {
+            "unload": [
+                "v47",
+                "v51",
+                "v52",
+                "v53",
+                "v54"
+            ]
+        }
+    ],
+    "vehicles": {
+        "v1": {
+            "dimension": 950
+        },
+        "v2": {
+            "dimension": 1100
+        },
+        "v3": {
+            "dimension": 1450
+        },
+        "v4": {
+            "dimension": 1100
+        },
+        "v5": {
+            "dimension": 1800
+        },
+        "v6": {
+            "dimension": 950
+        },
+        "v7": {
+            "dimension": 1250
+        },
+        "v8": {
+            "dimension": 1450
+        },
+        "v9": {
+            "dimension": 900
+        },
+        "v10": {
+            "dimension": 1450
+        },
+        "v11": {
+            "dimension": 850
+        },
+        "v12": {
+            "dimension": 1850
+        },
+        "v13": {
+            "dimension": 1150
+        },
+        "v14": {
+            "dimension": 1350
+        },
+        "v15": {
+            "dimension": 800
+        },
+        "v16": {
+            "dimension": 1850
+        },
+        "v17": {
+            "dimension": 1800
+        },
+        "v18": {
+            "dimension": 1150
+        },
+        "v19": {
+            "dimension": 1100
+        },
+        "v20": {
+            "dimension": 800
+        },
+        "v21": {
+            "dimension": 1100
+        },
+        "v22": {
+            "dimension": 1150
+        },
+        "v23": {
+            "dimension": 1800
+        },
+        "v24": {
+            "dimension": 1400
+        },
+        "v25": {
+            "dimension": 1100
+        },
+        "v26": {
+            "dimension": 1700
+        },
+        "v27": {
+            "dimension": 850
+        },
+        "v28": {
+            "dimension": 900
+        },
+        "v29": {
+            "dimension": 1200
+        },
+        "v30": {
+            "dimension": 1400
+        },
+        "v31": {
+            "dimension": 1250
+        },
+        "v32": {
+            "dimension": 1050
+        },
+        "v33": {
+            "dimension": 1100
+        },
+        "v34": {
+            "dimension": 1100
+        },
+        "v35": {
+            "dimension": 1550
+        },
+        "v36": {
+            "dimension": 1950
+        },
+        "v37": {
+            "dimension": 1400
+        },
+        "v38": {
+            "dimension": 1950
+        },
+        "v39": {
+            "dimension": 1150
+        },
+        "v40": {
+            "dimension": 950
+        },
+        "v41": {
+            "dimension": 1600
+        },
+        "v42": {
+            "dimension": 800
+        },
+        "v43": {
+            "dimension": 800
+        },
+        "v44": {
+            "dimension": 1100
+        },
+        "v45": {
+            "dimension": 1950
+        },
+        "v46": {
+            "dimension": 1750
+        },
+        "v47": {
+            "dimension": 1850
+        },
+        "v48": {
+            "dimension": 1100
+        },
+        "v49": {
+            "dimension": 1950
+        },
+        "v50": {
+            "dimension": 1150
+        },
+        "v51": {
+            "dimension": 1850
+        },
+        "v52": {
+            "dimension": 800
+        },
+        "v53": {
+            "dimension": 1900
+        },
+        "v54": {
+            "dimension": 1750
+        }
+    },
+    "transporter": {
+        "total_capacity": 11000,
+        "decks": {
+            "d1": {
+                "capacity": 3000,
+                "access_via": [
+                    [
+                        "d2",
+                        "d4"
+                    ],
+                    [
+                        "d3",
+                        "d4"
+                    ]
+                ]
+            },
+            "d2": {
+                "capacity": 3000,
+                "access_via": [
+                    [
+                        "d4"
+                    ]
+                ]
+            },
+            "d3": {
+                "capacity": 1000,
+                "access_via": [
+                    [
+                        "d4"
+                    ]
+                ]
+            },
+            "d4": {
+                "capacity": 4000
+            }
+        }
+    }
+}

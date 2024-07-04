@@ -1,0 +1,457 @@
+{
+    "route": [
+        {
+            "load": [
+                "v1",
+                "v2",
+                "v3",
+                "v4",
+                "v5",
+                "v6",
+                "v7",
+                "v8"
+            ]
+        },
+        {
+            "unload": [
+                "v4",
+                "v8",
+                "v3",
+                "v6",
+                "v1",
+                "v7"
+            ]
+        },
+        {
+            "load": [
+                "v9",
+                "v10",
+                "v11",
+                "v12",
+                "v13",
+                "v14"
+            ]
+        },
+        {
+            "unload": [
+                "v9",
+                "v14",
+                "v11",
+                "v2",
+                "v12",
+                "v10",
+                "v13",
+                "v5"
+            ],
+            "load": [
+                "v15",
+                "v16",
+                "v17",
+                "v18",
+                "v19",
+                "v20"
+            ]
+        },
+        {
+            "unload": [
+                "v18",
+                "v17",
+                "v15",
+                "v16",
+                "v19",
+                "v20"
+            ],
+            "load": [
+                "v21",
+                "v22",
+                "v23",
+                "v24",
+                "v25",
+                "v26",
+                "v27",
+                "v28"
+            ]
+        },
+        {
+            "unload": [
+                "v22",
+                "v23",
+                "v28",
+                "v27",
+                "v26"
+            ]
+        },
+        {
+            "unload": [
+                "v25"
+            ],
+            "load": [
+                "v29",
+                "v30",
+                "v31",
+                "v32",
+                "v33"
+            ]
+        },
+        {
+            "unload": [
+                "v30",
+                "v33",
+                "v29",
+                "v31",
+                "v32",
+                "v24",
+                "v21"
+            ],
+            "load": [
+                "v34",
+                "v35",
+                "v36",
+                "v37",
+                "v38",
+                "v39",
+                "v40",
+                "v41"
+            ]
+        },
+        {
+            "unload": [
+                "v40",
+                "v37",
+                "v36",
+                "v39",
+                "v41"
+            ],
+            "load": [
+                "v42",
+                "v43",
+                "v44",
+                "v45"
+            ]
+        },
+        {
+            "unload": [
+                "v34",
+                "v42",
+                "v44",
+                "v43"
+            ],
+            "load": [
+                "v46",
+                "v47",
+                "v48",
+                "v49",
+                "v50",
+                "v51"
+            ]
+        },
+        {
+            "unload": [
+                "v35",
+                "v50",
+                "v46",
+                "v51",
+                "v49",
+                "v45",
+                "v48",
+                "v47"
+            ],
+            "load": [
+                "v52",
+                "v53",
+                "v54",
+                "v55",
+                "v56",
+                "v57",
+                "v58",
+                "v59"
+            ]
+        },
+        {
+            "unload": [
+                "v55",
+                "v59",
+                "v57",
+                "v56",
+                "v53"
+            ],
+            "load": [
+                "v60",
+                "v61",
+                "v62",
+                "v63"
+            ]
+        },
+        {
+            "unload": [
+                "v62",
+                "v58",
+                "v52",
+                "v61",
+                "v38"
+            ],
+            "load": [
+                "v64",
+                "v65",
+                "v66",
+                "v67",
+                "v68"
+            ]
+        },
+        {
+            "unload": [
+                "v54",
+                "v60",
+                "v63",
+                "v64",
+                "v65",
+                "v66",
+                "v67",
+                "v68"
+            ]
+        }
+    ],
+    "vehicles": {
+        "v1": {
+            "dimension": 1350
+        },
+        "v2": {
+            "dimension": 1600
+        },
+        "v3": {
+            "dimension": 1400
+        },
+        "v4": {
+            "dimension": 1600
+        },
+        "v5": {
+            "dimension": 850
+        },
+        "v6": {
+            "dimension": 1750
+        },
+        "v7": {
+            "dimension": 1650
+        },
+        "v8": {
+            "dimension": 800
+        },
+        "v9": {
+            "dimension": 1550
+        },
+        "v10": {
+            "dimension": 800
+        },
+        "v11": {
+            "dimension": 1050
+        },
+        "v12": {
+            "dimension": 1900
+        },
+        "v13": {
+            "dimension": 2000
+        },
+        "v14": {
+            "dimension": 1250
+        },
+        "v15": {
+            "dimension": 950
+        },
+        "v16": {
+            "dimension": 850
+        },
+        "v17": {
+            "dimension": 1200
+        },
+        "v18": {
+            "dimension": 1050
+        },
+        "v19": {
+            "dimension": 1150
+        },
+        "v20": {
+            "dimension": 800
+        },
+        "v21": {
+            "dimension": 1050
+        },
+        "v22": {
+            "dimension": 1350
+        },
+        "v23": {
+            "dimension": 1350
+        },
+        "v24": {
+            "dimension": 1150
+        },
+        "v25": {
+            "dimension": 1950
+        },
+        "v26": {
+            "dimension": 1550
+        },
+        "v27": {
+            "dimension": 1000
+        },
+        "v28": {
+            "dimension": 1000
+        },
+        "v29": {
+            "dimension": 1700
+        },
+        "v30": {
+            "dimension": 1400
+        },
+        "v31": {
+            "dimension": 1100
+        },
+        "v32": {
+            "dimension": 1600
+        },
+        "v33": {
+            "dimension": 850
+        },
+        "v34": {
+            "dimension": 900
+        },
+        "v35": {
+            "dimension": 1650
+        },
+        "v36": {
+            "dimension": 1650
+        },
+        "v37": {
+            "dimension": 1900
+        },
+        "v38": {
+            "dimension": 900
+        },
+        "v39": {
+            "dimension": 1800
+        },
+        "v40": {
+            "dimension": 1350
+        },
+        "v41": {
+            "dimension": 850
+        },
+        "v42": {
+            "dimension": 1150
+        },
+        "v43": {
+            "dimension": 1200
+        },
+        "v44": {
+            "dimension": 900
+        },
+        "v45": {
+            "dimension": 1100
+        },
+        "v46": {
+            "dimension": 1150
+        },
+        "v47": {
+            "dimension": 1350
+        },
+        "v48": {
+            "dimension": 1850
+        },
+        "v49": {
+            "dimension": 850
+        },
+        "v50": {
+            "dimension": 1100
+        },
+        "v51": {
+            "dimension": 950
+        },
+        "v52": {
+            "dimension": 1450
+        },
+        "v53": {
+            "dimension": 1050
+        },
+        "v54": {
+            "dimension": 1550
+        },
+        "v55": {
+            "dimension": 800
+        },
+        "v56": {
+            "dimension": 1100
+        },
+        "v57": {
+            "dimension": 2000
+        },
+        "v58": {
+            "dimension": 850
+        },
+        "v59": {
+            "dimension": 1000
+        },
+        "v60": {
+            "dimension": 950
+        },
+        "v61": {
+            "dimension": 1900
+        },
+        "v62": {
+            "dimension": 1800
+        },
+        "v63": {
+            "dimension": 1000
+        },
+        "v64": {
+            "dimension": 1050
+        },
+        "v65": {
+            "dimension": 800
+        },
+        "v66": {
+            "dimension": 850
+        },
+        "v67": {
+            "dimension": 1250
+        },
+        "v68": {
+            "dimension": 1350
+        }
+    },
+    "transporter": {
+        "total_capacity": 11000,
+        "decks": {
+            "d1": {
+                "capacity": 3000,
+                "access_via": [
+                    [
+                        "d2",
+                        "d4"
+                    ],
+                    [
+                        "d3",
+                        "d4"
+                    ]
+                ]
+            },
+            "d2": {
+                "capacity": 3000,
+                "access_via": [
+                    [
+                        "d4"
+                    ]
+                ]
+            },
+            "d3": {
+                "capacity": 1000,
+                "access_via": [
+                    [
+                        "d4"
+                    ]
+                ]
+            },
+            "d4": {
+                "capacity": 4000
+            }
+        }
+    }
+}
