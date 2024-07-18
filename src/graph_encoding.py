@@ -4,20 +4,28 @@
 
 import os
 import json
+import pickle
 import pandas as pd
+from scipy.spatial.distance import cdist
+from sklearn.preprocessing import StandardScaler
 import networkx as nx
 import numpy as np
 import torch
-from torch_geometric.data import Data
 from node2vec import Node2Vec
+from torch_geometric.data import Data
+from torch_geometric.nn import Node2Vec as Node2Vec_2
+from torch_geometric.utils import from_networkx
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm.notebook import tqdm
 from torch.optim import Adam
 from karateclub import FeatherGraph
 from sklearn.model_selection import train_test_split
+from node2vec.edges import HadamardEmbedder
+from torch_geometric.nn import GCNConv, global_mean_pool
 from data_preprocessing import *
 
 
@@ -132,49 +140,331 @@ print("------------------------------------------------- \n")
 ### ---------------------------------------------------------------------------
 
 
+#%%#
+### Similar graphs selection ####################################################
+
+## Basic graph information extraction
+def adjacency_metric_extract(G):
+    A = nx.adjacency_matrix(G, weight='weight')
+    return A
+
+
+## Extract the nodes from the graph
+def node_extract(G):
+    nodes = []
+    for node in G.nodes(data=True):
+        nodes.append(node)
+    return nodes
+
+
+## Extract the edges from the graph
+def edge_extract(G):
+    edges = []
+    for edge in G.edges(data=True):
+        edges.append(edge)
+    return edges
+
+
+## Edge_index matrix using torch_geometric.node2vec
+def edge_index_extractor(G):
+    # Extract the adjacency matrix in COO format
+    A = nx.adjacency_matrix(G, weight='weight').tocoo()
+    
+    # Extract row, column, and data (weight) from the COO matrix
+    row = torch.tensor(A.row, dtype=torch.long)
+    col = torch.tensor(A.col, dtype=torch.long)
+    edge_index = torch.stack([row, col], dim=0)
+    
+    # Extract edge weights
+    edge_weight = torch.tensor(A.data, dtype=torch.float)
+    
+    return edge_index
+
+
+## Edge_weight matrix using torch_geometric.node2vec
+def edge_weight_extractor(G):
+    a = nx.adjacency_matrix(G, weight='weight')
+    coo_matrix = a.tocoo()
+    edge_weight = torch.tensor(coo_matrix.data, dtype=torch.float)
+    return edge_weight
+
+
+## Edge_weight matrix using torch_geometric.node2vec one hot encoding for edge attribute
+def edge_att_extractor(G):
+    ## For attribute in edge, 'action' doing one-hot encoding, there are 'next', 'via', 'load', 'unload', 'applicable'
+    ## Build a tensor matrix for the edge feature, store the one-hot encoding for each edge
+    edge_features = []
+    for edge in range(len(edge_extract(G))):
+        if edge_extract(G)[edge][2]['action'] == 'next':
+            edge_features.append([1, 0, 0, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'via':
+            edge_features.append([0, 1, 0, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'load via': ## v5, v3_4=load via, v3_3=load
+            edge_features.append([0, 0, 1, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'unload':
+            edge_features.append([0, 0, 0, 1, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'applicable':
+            edge_features.append([0, 0, 0, 0, 1])
+
+    edge_features = torch.tensor(edge_features, dtype=torch.float32)
+    return edge_features
+
+
+## Edge_weight matrix using torch_geometric.node2vec one hot encoding for edge feature
+def edge_feature_extractor(G):
+    ## Combine edge weight and edge features using torch.cat
+    edge_feature = torch.cat([edge_weight_extractor(G).unsqueeze(1), edge_att_extractor(G)], dim=1)
+    return edge_feature
+    
+    
+
+## Node feature matrix for v5
+def node_feature_raw_v5(graph, feature='representation'):
+    ## do one hot encoding for the node feature using the node name + representation
+    node_features = []
+    for i in range(len(node_extract(graph))):
+        if 'stop' in node_extract(graph)[i][0]:
+            node_features.append([1, 0, 0, node_extract(graph)[i][1][feature]])
+        elif 'v' in node_extract(graph)[i][0] and 'd' not in node_extract(graph)[i][0]:
+            node_features.append([0, 1, 0, node_extract(graph)[i][1][feature]])
+        elif 'v' in node_extract(graph)[i][0] and 'd' in node_extract(graph)[i][0]:
+            node_features.append([0, 0, 1, node_extract(graph)[i][1][feature]])
+    ## convert the node into tensor
+    node_features = torch.tensor(node_features, dtype=torch.float32)
+    return node_features
+    
+
+def node_feature_raw(graph, feature='representation'):
+    ## do one hot encoding for the node feature using the node name + representation
+    node_features = []
+    for i in range(len(node_extract(graph))):
+        if 'stop' in node_extract(graph)[i][0]:
+            node_features.append([1, 0, 0, node_extract(graph)[i][1][feature]])
+        elif 'v' in node_extract(graph)[i][0]:
+            node_features.append([0, 1, 0, node_extract(graph)[i][1][feature]])
+        elif 'd' in node_extract(graph)[i][0]:
+            node_features.append([0, 0, 1, node_extract(graph)[i][1][feature]])
+    ## convert the node into tensor
+    node_features = torch.tensor(node_features, dtype=torch.float32)
+    return node_features
+
+
+
+## Node feature matrix using torch_geometric.node2vec, the result should be n-nodes x 64-features
+def node_feature_node2vec(graph):
+    ## Train Node2Vec model on the combined graph
+    device = 'mps' if torch.cuda.is_available() else 'cpu'
+    ## Generate the edge_index for the graph
+    data = from_networkx(graph)
+    ## Learn the node embedding individually
+    model = Node2Vec_2(data.edge_index, embedding_dim=64, walk_length=40,
+                    context_size=15, walks_per_node=25,
+                    num_negative_samples=1, p=1, q=1, sparse=True).to(device)
+
+    loader = model.loader(batch_size=128, shuffle=True, num_workers=0)
+    optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
+
+    def train():
+        model.train()  # Set the model to training mode
+        total_loss = 0
+        for pos_rw, neg_rw in tqdm(loader):
+            optimizer.zero_grad()  # Set the gradients to zero
+            loss = model.loss(pos_rw.to(device), neg_rw.to(device))  # Compute the loss for the batch
+            loss.backward()  # Backpropagate the loss
+            optimizer.step()  # Optimize the parameters
+            total_loss += loss.item()
+        return total_loss / len(loader)
+    for epoch in range(1, 31):
+        loss = train()
+        if epoch % 10 == 0:  # Print loss every 10 epochs
+            print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
+
+    data = from_networkx(graph)
+
+    node_embeddings = model(torch.arange(data.num_nodes)).detach().cpu().numpy()
+
+    ## Convert the node_embeddings into tensor
+    node_embeddings = torch.tensor(node_embeddings, dtype=torch.float32)
+
+    return node_embeddings
+
+
+
+
+if __name__ == '__main__':
+    feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
+
+    infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
+
+
+    feasible_graphs = []
+    for file in os.listdir(feasible_data_dir):
+        if file.endswith('.json') and 'solution' not in file:
+            data = read_json_file(os.path.join(feasible_data_dir, file))
+            G = json_to_graph_v3_4_weight(data)
+            feasible_graphs.append(G)
+
+
+    ## Originally load all 100K infeasible graphs
+    infeasible_graphs = []
+    for file in os.listdir(infeasible_data_dir):
+        if file.endswith('.json') and 'solution' not in file:
+            data = read_json_file(os.path.join(infeasible_data_dir, file))
+            G = json_to_graph_v3_4_weight(data)
+            infeasible_graphs.append(G)
+
+
+    # ## Random select 100 feasible solutions
+    # feasible_graphs = np.random.choice(feasible_graphs, 100, replace=False)
+
+
+    ## Extract features for all graphs for both feasible and infeasible graphs
+    ### Using extract_graph_features_v2 for v3_3 and v3_4
+    ### Using extract_graph_features_v3 for v5
+    feasible_features_list = [extract_graph_features_v2(graph) for graph in feasible_graphs]
+    infeasible_features_list = [extract_graph_features_v2(graph) for graph in infeasible_graphs]
+
+
+    ## COnvert the list into dataframe
+    feasible_features_df = pd.DataFrame(feasible_features_list)
+    infeasible_features_df = pd.DataFrame(infeasible_features_list)
+
+
+    ## Standardize the features
+    scaler = StandardScaler()
+    feasible_scaled_features = scaler.fit_transform(feasible_features_df)
+    infeasible_scaled_features = scaler.transform(infeasible_features_df)
+
+
+    ## Select the most similar feasible and infeasible graphs
+    selected_infeasible_graphs = []
+    remaining_infeasible_features = infeasible_scaled_features.copy()
+    remaining_infeasible_graphs = infeasible_graphs.copy()
+
+
+    for feasible_feature, feasible_graph in zip(feasible_scaled_features, feasible_graphs):
+        distances = cdist([feasible_feature], remaining_infeasible_features, 'euclidean').flatten()
+        closest_idx = np.argmin(distances)
+        
+        ## Select and remove the closest infeasible graph
+        selected_infeasible_graphs.append(remaining_infeasible_graphs.pop(closest_idx))
+        remaining_infeasible_features = np.delete(remaining_infeasible_features, closest_idx, axis=0)
+
+
+    ## Then select 2610 infeasible graphs from the selected infeasible graphs
+    selected_infeasible_graphs = np.random.choice(selected_infeasible_graphs, 2610, replace=False)
+    selected_infeasible_graphs = selected_infeasible_graphs.tolist()
+
+
+    ## Assign the label for the feasible and infeasible graphs
+    y1 = torch.tensor([1], dtype=torch.long)
+    y0 = torch.tensor([0], dtype=torch.long)
+
+
+    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw/v3_4/'
+
+    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw/v3_4/'
+
+
+    # for idx, graph in enumerate(feasible_graphs):
+    #     node_features = node_feature_node2vec(graph)
+    #     edge_dd = edge_index_extractor(graph)
+    #     edge_we = edge_weight_extractor(graph)
+    #     edge_att = edge_att_extractor(graph)
+    #     edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
+    #     data = Data(x=node_features, edge_index=edge_dd, y=y1, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
+    #     save_path = os.path.join(save_dir_feasible, f'feasible_graph_{idx}.pt')
+    #     torch.save(data, save_path)
+    #     print(f'Saved {save_path}')
+
+
+    
+    ##### Save the selected infeasible graphs -----------------------------------------------------
+    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/v5/feasible_graphs.pkl', 'wb') as f:
+        pickle.dump(feasible_graphs, f)
+    
+
+    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/v5/selected_graphs.pkl', 'wb') as f:
+        pickle.dump(selected_infeasible_graphs, f)
+
+
+
+    ## Load the selected infeasible graphs
+    # with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/v3_3/selected_graphs.pkl', 'rb') as f:
+    #     selected_infeasible_graphs = pickle.load(f)
+
+    ##### -----------------------------------------------------------------------------------------
+
+
+    start_idx = 0
+    
+
+    for idx, graph in enumerate(feasible_graphs[start_idx:], start=start_idx):
+        node_features = node_feature_raw(graph)
+        edge_dd = edge_index_extractor(graph)
+        edge_we = edge_weight_extractor(graph)
+        edge_att = edge_att_extractor(graph)
+        edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
+
+        data = Data(x=node_features, edge_index=edge_dd, y=y1, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
+        save_path = os.path.join(save_dir_feasible, f'feasible_graph_{idx}.pt')
+        torch.save(data, save_path)
+        print(f'Saved {save_path}')
+
+
+    
+    for idx, graph in enumerate(selected_infeasible_graphs[start_idx:], start=start_idx):
+        node_features = node_feature_raw(graph)
+        edge_dd = edge_index_extractor(graph)
+        edge_we = edge_weight_extractor(graph)
+        edge_att = edge_att_extractor(graph)
+        edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
+
+        data = Data(x=node_features, edge_index=edge_dd, y=y0, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
+        save_path = os.path.join(save_dir_infeasible, f'infeasible_graph_{idx}.pt')
+        torch.save(data, save_path)
+        print(f'Saved {save_path}')
+
+
+    ## COnvert all y in infeasible data into 0
+    # for data in infeasible_data:
+    #     data.y = y0
+
+
+
+    
+    
+
+    # ### ---------------------------------------------------------------------------
+
+
+
+
+
+
 
 #%%#
 ### Step-3-1-1 node2vec_multi-graphs embedding for GraphClassification ###########################
-### Train the node2vec model on multiple graphs
-### Convert the graph data into vector data - for classify the graph is feasible or not
+### Train the node2vec model on one graph - 100K instances - node2vec package - separate graphs
+
 
 
 ## Load the feasible and infeasible graph data from /Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/instances/feasible
-feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/instances/feasible'
+feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
 
-
-infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/instances/infeasible'
-
-
-## Load the feasible graph data from the data directory 
-feasible_graphs = []
-for file in os.listdir(feasible_data_dir):
-    if file.endswith('.json'):
-        data = read_json_file(os.path.join(feasible_data_dir, file))
-        G = json_to_graph_v4(data)
-        feasible_graphs.append(G)
-
-
-infeasible_graphs = []
-##  randomly select 1000 infeasible instances from the data directory to make the dataset balanced
-infeasible_files = np.random.choice(os.listdir(infeasible_data_dir), 303, replace=False)
-for file in infeasible_files:
-    if file.endswith('.json'):
-        data = read_json_file(os.path.join(infeasible_data_dir, file))
-        G = json_to_graph_v4(data)
-        infeasible_graphs.append(G)
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
 
 
 
 ## Node2vec for GraphClassification 
 def graph_to_vector_node2vec(g, agg_method='sum'):
-    node2vec = Node2Vec(g, dimensions=64, walk_length=30, num_walks=100, workers=4)
-    model = node2vec.fit(window=10, min_count=1, batch_words=4)
+    node2vec = Node2Vec(g, dimensions=64, walk_length=200, num_walks=300, workers=4)
+    model = node2vec.fit(window=10, min_count=1, batch_words=10)
     
     ## Get the node vectors
     node_vectors = []
     for node in g.nodes():
-        node_vectors.append(model.wv[node])
+        node_vectors.append(model.wv[str(node)])
 
     ## COnvert the node vectors into graph vector
     if agg_method == 'mean':
@@ -188,21 +478,44 @@ def graph_to_vector_node2vec(g, agg_method='sum'):
 
 
 
+
+
 if __name__ == '__main__':
+    feasible_graphs = []
+    for file in os.listdir(feasible_data_dir):
+        ## Select the file with json format and file name do not contain solution
+        if file.endswith('.json') and 'solution' not in file:
+            data = read_json_file(os.path.join(feasible_data_dir, file))
+            G = json_to_graph_v3_2(data)
+            feasible_graphs.append(G)
+
+
+    infeasible_graphs = []
+    ## Select the file with json format
+    infeasible_files = [file for file in os.listdir(infeasible_data_dir) if file.endswith('.json')]
+    ## Random select 2610 files from those files
+    infeasible_files = np.random.choice(infeasible_files, 2610, replace=False)
+    for file in infeasible_files:
+        data = read_json_file(os.path.join(infeasible_data_dir, file))
+        G = json_to_graph_v3_2(data)
+        infeasible_graphs.append(G)
+
+
     ## Transform the graph vector as data frame format
     feasible_graph_vectors = []
-    for i, graph in enumerate(feasible_graphs):
-        print(f"Processing feasible graph {i+1}/{len(feasible_graphs)}")
-        graph_vector = graph_to_vector_node2vec(graph, agg_method='sum')
+    for graph in feasible_graphs:
+        # print(f"Processing feasible graph {i+1}/{len(feasible_graphs)}")
+        graph_vector = graph_to_vector_node2vec(graph, agg_method='mean')
         feasible_graph_vectors.append(graph_vector)
 
+
     infeasible_graph_vectors = []
-    for k, graph in enumerate(infeasible_graphs):
-        print(f"Processing infeasible graph {k+1}/{len(infeasible_graphs)}")
-        graph_vector = graph_to_vector_node2vec(graph, agg_method='sum')
+    for graph in infeasible_graphs:
+        # print(f"Processing infeasible graph {k+1}/{len(infeasible_graphs)}")
+        graph_vector = graph_to_vector_node2vec(graph, agg_method='mean')
         infeasible_graph_vectors.append(graph_vector)
 
-
+   
     ## Store the graph vectors into data frame
     feasible_df = pd.DataFrame(feasible_graph_vectors)
     feasible_df['label'] = 1
@@ -223,7 +536,7 @@ if __name__ == '__main__':
 
 #%%#
 ### Step-3-1-2 node2vec_one graph embedding for NodeClassification ################################
-### Train the node2vec model on one graph - 100K instances
+### Train the node2vec model on one graph - 100K instances - node2vec package - combined graph
 
 # ## Load the feasible and infeasible graph data
 # feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/instances/feasible'
@@ -253,39 +566,9 @@ if __name__ == '__main__':
 ## Load the feasible and infeasible graph data
 feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
 
+
 infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
 
-
-feasible_graphs = []
-for file in os.listdir(feasible_data_dir):
-    ## Select the file with json format and file name do not contain solution
-    if file.endswith('.json') and 'solution' not in file:
-        data = read_json_file(os.path.join(feasible_data_dir, file))
-        G = json_to_graph_v4(data)
-        feasible_graphs.append(G)
-
-
-infeasible_graphs = []
-## Select the file with json format
-infeasible_files = [file for file in os.listdir(infeasible_data_dir) if file.endswith('.json')]
-## Random select 2610 files from those files
-infeasible_files = np.random.choice(infeasible_files, 2610, replace=False)
-for file in infeasible_files:
-    data = read_json_file(os.path.join(infeasible_data_dir, file))
-    G = json_to_graph_v4(data)
-    infeasible_graphs.append(G)
-
-
-
-## Combine all graphs into one big graph for Node2Vec training
-combined_graph = nx.MultiDiGraph()
-for graph in feasible_graphs + infeasible_graphs:
-    combined_graph = nx.compose(combined_graph, graph)
-
-
-## Train Node2Vec model on the combined graph
-node2vec = Node2Vec(combined_graph, dimensions=64, walk_length=80, num_walks=80, workers=10)
-model = node2vec.fit(window=10, min_count=1, batch_words=10)
 
 
 ## Function to generate graph-level embeddings using the trained Node2Vec model
@@ -306,17 +589,49 @@ def graph_to_vector_node2vec(g, model, agg_method='sum'):
 
 
 if __name__ == '__main__':
+    feasible_graphs = []
+    for file in os.listdir(feasible_data_dir):
+        ## Select the file with json format and file name do not contain solution
+        if file.endswith('.json') and 'solution' not in file:
+            data = read_json_file(os.path.join(feasible_data_dir, file))
+            G = json_to_graph_v3_2(data)
+            feasible_graphs.append(G)
+
+
+    infeasible_graphs = []
+    ## Select the file with json format
+    infeasible_files = [file for file in os.listdir(infeasible_data_dir) if file.endswith('.json')]
+    ## Random select 2610 files from those files
+    infeasible_files = np.random.choice(infeasible_files, 2610, replace=False)
+    for file in infeasible_files:
+        data = read_json_file(os.path.join(infeasible_data_dir, file))
+        G = json_to_graph_v3_2(data)
+        infeasible_graphs.append(G)
+
+
+    ## Combine all graphs into one big graph for Node2Vec training
+    combined_graph = nx.MultiDiGraph()
+    for graph in feasible_graphs + infeasible_graphs:
+        combined_graph = nx.compose(combined_graph, graph)
+
+
+    ## Train Node2Vec model on the combined graph
+    node2vec = Node2Vec(combined_graph, dimensions=64, walk_length=200, num_walks=300, workers=10)
+    model = node2vec.fit(window=10, min_count=1, batch_words=10)
+
+
     ## Transform the graph vector as data frame format
     feasible_graph_vectors = []
     for i, graph in enumerate(feasible_graphs):
         print(f"Processing feasible graph {i+1}/{len(feasible_graphs)}")
-        graph_vector = graph_to_vector_node2vec(graph, model, agg_method='sum')
+        graph_vector = graph_to_vector_node2vec(graph, model, agg_method='mean')
         feasible_graph_vectors.append(graph_vector)
+
 
     infeasible_graph_vectors = []
     for k, graph in enumerate(infeasible_graphs):
         print(f"Processing infeasible graph {k+1}/{len(infeasible_graphs)}")
-        graph_vector = graph_to_vector_node2vec(graph, model, agg_method='sum')
+        graph_vector = graph_to_vector_node2vec(graph, model, agg_method='mean')
         infeasible_graph_vectors.append(graph_vector)
 
 
@@ -331,6 +646,136 @@ if __name__ == '__main__':
 
     ## Save the graph vectors into csv file
     # graph_df.to_csv('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/v4_graph_vectors_node2vec_mean_one.csv', index=False)
+
+
+
+#%%#
+### Step-3-1-3 node2vec_ torch gem embedding for NodeClassification ############################
+
+## Load the feasible and infeasible graph data
+feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
+
+
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
+
+
+def graph_to_vector_node2vec(graph, model, agg_method='mean'):
+    data = from_networkx(graph)
+    node_embeddings = model(torch.arange(data.num_nodes)).detach().cpu().numpy()
+    if agg_method == 'mean':
+        graph_vector = np.mean(node_embeddings, axis=0)
+    elif agg_method == 'sum':
+        graph_vector = np.sum(node_embeddings, axis=0)
+    elif agg_method == 'max':
+        graph_vector = np.max(node_embeddings, axis=0)
+    else:
+        raise ValueError(f"Unknown aggregation method: {agg_method}")
+    return graph_vector
+
+
+
+
+if __name__ == '__main__':
+    feasible_graphs = []
+    for file in os.listdir(feasible_data_dir):
+        ## Select the file with json format and file name do not contain solution
+        if file.endswith('.json') and 'solution' not in file:
+            data = read_json_file(os.path.join(feasible_data_dir, file))
+            G = json_to_graph_v3_3(data)
+            feasible_graphs.append(G)
+
+
+    infeasible_graphs = []
+    ## Select the file with json format
+    infeasible_files = [file for file in os.listdir(infeasible_data_dir) if file.endswith('.json')]
+    ## Random select 2610 files from those files
+    infeasible_files = np.random.choice(infeasible_files, 2610, replace=False)
+    for file in infeasible_files:
+        data = read_json_file(os.path.join(infeasible_data_dir, file))
+        G = json_to_graph_v3_3(data)
+        infeasible_graphs.append(G)
+
+
+    ## Combine all graphs into one big graph for Node2Vec training
+    combined_graph = nx.MultiDiGraph()
+    for graph in feasible_graphs + infeasible_graphs:
+        combined_graph = nx.compose(combined_graph, graph)
+
+
+    ## Train Node2Vec model on the combined graph
+    device = 'mps' if torch.cuda.is_available() else 'cpu'
+    
+    ## Generate the edge_index for the graph
+    data = from_networkx(combined_graph)
+    model = Node2Vec_2(data.edge_index, embedding_dim=64, walk_length=200,
+                    context_size=20, walks_per_node=300,
+                    num_negative_samples=1, p=1, q=1, sparse=True).to(device)
+    
+    loader = model.loader(batch_size=128, shuffle=True, num_workers=0)
+    optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
+
+    def train():
+        model.train()  # Set the model to training mode
+        total_loss = 0
+        for pos_rw, neg_rw in tqdm(loader):
+            optimizer.zero_grad()  # Set the gradients to zero
+            loss = model.loss(pos_rw.to(device), neg_rw.to(device))  # Compute the loss for the batch
+            loss.backward()  # Backpropagate the loss
+            optimizer.step()  # Optimize the parameters
+            total_loss += loss.item()
+        return total_loss / len(loader)
+    
+    for epoch in range(1, 101):
+        loss = train()
+        if epoch % 10 == 0:  # Print loss every 10 epochs
+            print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
+
+
+    ## Transform the graph vector as data frame format
+    feasible_graph_vectors = []
+    for i, graph in enumerate(feasible_graphs):
+        print(f"Processing feasible graph {i+1}/{len(feasible_graphs)}")
+        graph_vector = graph_to_vector_node2vec(graph, model, agg_method='sum')
+        feasible_graph_vectors.append(graph_vector)
+
+
+    infeasible_graph_vectors = []
+    for k, graph in enumerate(infeasible_graphs):
+        print(f"Processing infeasible graph {k+1}/{len(infeasible_graphs)}")
+        graph_vector = graph_to_vector_node2vec(graph, model, agg_method='sum')
+        infeasible_graph_vectors.append(graph_vector)
+
+
+    ## Store the graph vectors into data frame
+    feasible_df = pd.DataFrame(feasible_graph_vectors)
+    feasible_df['label'] = 1
+    infeasible_df = pd.DataFrame(infeasible_graph_vectors)
+    infeasible_df['label'] = 0
+    
+    ## Combine the feasible and infeasible graph vectors
+    graph_df = pd.concat([feasible_df, infeasible_df], axis=0)
+
+    ## Save the graph vectors into csv file
+    # graph_df.to_csv('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/v6_graph_vectors_node2vec_2_sum_one.csv', index=False)
+
+
+## Save the node2vec model
+save_path = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/models/node2vec_v6.pt'
+# torch.save(model.state_dict(), save_path)
+
+## Load the node2vec model
+## Initialize a new model instance with the same parameters
+# loaded_model = Node2Vec(data.edge_index, embedding_dim=64, walk_length=80,
+#                         context_size=10, walks_per_node=80,
+#                         num_negative_samples=1, p=1, q=1, sparse=True)
+
+# # Load the state dictionary into the model
+# loaded_model.load_state_dict(torch.load(save_path))
+
+# # Ensure the model is in evaluation mode
+# loaded_model.eval()
+
+
 
 
 
@@ -460,123 +905,123 @@ feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-le
 
 infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/instances/infeasible'
 
-# Load feasible graphs
-feasible_graphs = []
-for file in os.listdir(feasible_data_dir):
-    if file.endswith('.json'):
-        data = read_json_file(os.path.join(feasible_data_dir, file))
-        G = json_to_graph_v4(data)
-        feasible_graphs.append(G)
+# # Load feasible graphs
+# feasible_graphs = []
+# for file in os.listdir(feasible_data_dir):
+#     if file.endswith('.json'):
+#         data = read_json_file(os.path.join(feasible_data_dir, file))
+#         G = json_to_graph_v4(data)
+#         feasible_graphs.append(G)
 
-# Load infeasible graphs
-infeasible_graphs = []
-infeasible_files = np.random.choice(os.listdir(infeasible_data_dir), 303, replace=False)
-for file in infeasible_files:
-    if file.endswith('.json'):
-        data = read_json_file(os.path.join(infeasible_data_dir, file))
-        G = json_to_graph_v4(data)
-        infeasible_graphs.append(G)
+# # Load infeasible graphs
+# infeasible_graphs = []
+# infeasible_files = np.random.choice(os.listdir(infeasible_data_dir), 303, replace=False)
+# for file in infeasible_files:
+#     if file.endswith('.json'):
+#         data = read_json_file(os.path.join(infeasible_data_dir, file))
+#         G = json_to_graph_v4(data)
+#         infeasible_graphs.append(G)
 
 
-class Structure2Vec(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_iterations):
-        super(Structure2Vec, self).__init__()
-        self.hidden_dim = hidden_dim
-        self.num_iterations = num_iterations
-        self.W1 = nn.Parameter(torch.randn(input_dim, hidden_dim))
-        self.W2 = nn.Parameter(torch.randn(hidden_dim, hidden_dim))
-        self.W3 = nn.Parameter(torch.randn(hidden_dim, hidden_dim))
-        self.b1 = nn.Parameter(torch.zeros(hidden_dim))
-        self.b2 = nn.Parameter(torch.zeros(hidden_dim))
+# class Structure2Vec(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, num_iterations):
+#         super(Structure2Vec, self).__init__()
+#         self.hidden_dim = hidden_dim
+#         self.num_iterations = num_iterations
+#         self.W1 = nn.Parameter(torch.randn(input_dim, hidden_dim))
+#         self.W2 = nn.Parameter(torch.randn(hidden_dim, hidden_dim))
+#         self.W3 = nn.Parameter(torch.randn(hidden_dim, hidden_dim))
+#         self.b1 = nn.Parameter(torch.zeros(hidden_dim))
+#         self.b2 = nn.Parameter(torch.zeros(hidden_dim))
     
-    def linear_transform(self, x, W, b):
-        return torch.matmul(x, W) + b
+#     def linear_transform(self, x, W, b):
+#         return torch.matmul(x, W) + b
     
-    def forward(self, features, adj):
-        h = self.linear_transform(features, self.W1, self.b1)
+#     def forward(self, features, adj):
+#         h = self.linear_transform(features, self.W1, self.b1)
         
-        for _ in range(self.num_iterations):
-            m = torch.matmul(adj, h)
-            h = F.relu(self.linear_transform(m + h, self.W2, self.b2))
+#         for _ in range(self.num_iterations):
+#             m = torch.matmul(adj, h)
+#             h = F.relu(self.linear_transform(m + h, self.W2, self.b2))
         
-        g = torch.mean(h, dim=0)  # Graph-level embedding by mean pooling
-        g = self.linear_transform(g, self.W3, self.b1)
+#         g = torch.mean(h, dim=0)  # Graph-level embedding by mean pooling
+#         g = self.linear_transform(g, self.W3, self.b1)
         
-        return g  # Return the graph-level embedding
+#         return g  # Return the graph-level embedding
 
 
-def generate_graph_embedding_s2v(model, graph, features):
-    adj = nx.adjacency_matrix(graph).todense()
-    adj = torch.tensor(adj, dtype=torch.float32)
-    features = torch.tensor(features, dtype=torch.float32)
+# def generate_graph_embedding_s2v(model, graph, features):
+#     adj = nx.adjacency_matrix(graph).todense()
+#     adj = torch.tensor(adj, dtype=torch.float32)
+#     features = torch.tensor(features, dtype=torch.float32)
     
-    graph_embedding = model(features, adj)
+#     graph_embedding = model(features, adj)
     
-    return graph_embedding.detach().numpy()
+#     return graph_embedding.detach().numpy()
 
 
-# Model parameters
-input_dim = 10  # Number of input features
-hidden_dim = 64
-num_iterations = 10
+# # Model parameters
+# input_dim = 10  # Number of input features
+# hidden_dim = 64
+# num_iterations = 10
 
-# Initialize the Structure2Vec model
-s2v_model = Structure2Vec(input_dim, hidden_dim, num_iterations)
-
-
-# Example function to extract node features from a graph
-def extract_node_features(graph, input_dim):
-    features = []
-    for node in graph.nodes():
-        node_feature = graph.nodes[node].get('features', [])
-        if len(node_feature) < input_dim:
-            node_feature = node_feature + [0] * (input_dim - len(node_feature))
-        else:
-            node_feature = node_feature[:input_dim]
-        features.append(node_feature)
-    return np.array(features)
+# # Initialize the Structure2Vec model
+# s2v_model = Structure2Vec(input_dim, hidden_dim, num_iterations)
 
 
-# Prepare training data for Structure2Vec
-X_graphs = feasible_graphs + infeasible_graphs
-y_labels = [1] * len(feasible_graphs) + [0] * len(infeasible_graphs)
+# # Example function to extract node features from a graph
+# def extract_node_features(graph, input_dim):
+#     features = []
+#     for node in graph.nodes():
+#         node_feature = graph.nodes[node].get('features', [])
+#         if len(node_feature) < input_dim:
+#             node_feature = node_feature + [0] * (input_dim - len(node_feature))
+#         else:
+#             node_feature = node_feature[:input_dim]
+#         features.append(node_feature)
+#     return np.array(features)
 
-# Split the data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_graphs, y_labels, test_size=0.2, random_state=42)
 
-train_data = [(extract_node_features(graph, input_dim), nx.adjacency_matrix(graph).todense(), label)
-              for graph, label in zip(X_train, y_train)]
+# # Prepare training data for Structure2Vec
+# X_graphs = feasible_graphs + infeasible_graphs
+# y_labels = [1] * len(feasible_graphs) + [0] * len(infeasible_graphs)
 
-test_data = [(extract_node_features(graph, input_dim), nx.adjacency_matrix(graph).todense(), label)
-              for graph, label in zip(X_test, y_test)]
+# # Split the data into training and testing sets
+# X_train, X_test, y_train, y_test = train_test_split(X_graphs, y_labels, test_size=0.2, random_state=42)
+
+# train_data = [(extract_node_features(graph, input_dim), nx.adjacency_matrix(graph).todense(), label)
+#               for graph, label in zip(X_train, y_train)]
+
+# test_data = [(extract_node_features(graph, input_dim), nx.adjacency_matrix(graph).todense(), label)
+#               for graph, label in zip(X_test, y_test)]
 
 
-def train_s2v(model, data, epochs=100, learning_rate=0.01):
-    optimizer = Adam(model.parameters(), lr=learning_rate)
-    loss_fn = nn.MSELoss()  # Using MSELoss for regression task (if embeddings are target)
+# def train_s2v(model, data, epochs=100, learning_rate=0.01):
+#     optimizer = Adam(model.parameters(), lr=learning_rate)
+#     loss_fn = nn.MSELoss()  # Using MSELoss for regression task (if embeddings are target)
 
-    for epoch in range(epochs):
-        model.train()
-        optimizer.zero_grad()
+#     for epoch in range(epochs):
+#         model.train()
+#         optimizer.zero_grad()
 
-        losses = []
-        for features, adj, label in data:
-            features = torch.tensor(features, dtype=torch.float32)
-            adj = torch.tensor(adj, dtype=torch.float32)
-            label = torch.tensor(label, dtype=torch.float32)  # Ensure correct data type
+#         losses = []
+#         for features, adj, label in data:
+#             features = torch.tensor(features, dtype=torch.float32)
+#             adj = torch.tensor(adj, dtype=torch.float32)
+#             label = torch.tensor(label, dtype=torch.float32)  # Ensure correct data type
 
-            output = model(features, adj)
-            loss = loss_fn(output, label)
-            losses.append(loss.item())
+#             output = model(features, adj)
+#             loss = loss_fn(output, label)
+#             losses.append(loss.item())
 
-            loss.backward()
-            optimizer.step()
+#             loss.backward()
+#             optimizer.step()
         
-        if epoch % 10 == 0:
-            avg_loss = np.mean(losses)
-            print(f'Epoch {epoch}, Loss: {avg_loss}')
+#         if epoch % 10 == 0:
+#             avg_loss = np.mean(losses)
+#             print(f'Epoch {epoch}, Loss: {avg_loss}')
 
-train_s2v(s2v_model, train_data)
+# train_s2v(s2v_model, train_data)
 
 # if __name__ == '__main__':
 #     feasible_graph_vectors = []

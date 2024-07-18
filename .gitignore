@@ -32,3 +32,6 @@ __pycache__/
 
 # Ignore the 100_K instances files
 100_K_instances/
+
+# Ignore processed data
+processed_data/

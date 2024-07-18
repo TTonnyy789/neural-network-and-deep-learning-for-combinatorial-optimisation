@@ -5,17 +5,19 @@
 
 ## Import the necessary libraries
 import pandas as pd
+import os
 import numpy as np
 import datetime
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
-import lightgbm as lgb
-import xgboost as xgb
-from xgboost import XGBRegressor
-from tslearn.clustering import TimeSeriesKMeans, KShape
-from tslearn.preprocessing import TimeSeriesScalerMeanVariance
-from tslearn.metrics import soft_dtw, dtw
+# import seaborn as sns
+# import lightgbm as lgb
+# import xgboost as xgb
+# from xgboost import XGBRegressor
+# from tslearn.clustering import TimeSeriesKMeans, KShape
+# from tslearn.preprocessing import TimeSeriesScalerMeanVariance
+# from tslearn.metrics import soft_dtw, dtw
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestRegressor
@@ -23,144 +25,112 @@ from sklearn.metrics import silhouette_score, mean_squared_error, r2_score, mean
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder, OneHotEncoder
 from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV, TimeSeriesSplit, RandomizedSearchCV, KFold, StratifiedKFold, cross_val_predict
-from nixtlats import NixtlaClient
-from nixtlats.date_features import CountryHolidays
-from pytorch_forecasting import TimeSeriesDataSet
+# from nixtlats import NixtlaClient
+# from nixtlats.date_features import CountryHolidays
+# from pytorch_forecasting import TimeSeriesDataSet
 from keras.models import Sequential, save_model, load_model, save_model
 from keras.layers import Dense, LSTM, Embedding, Input
-from statsmodels.tools.eval_measures import rmse, rmspe
+# from statsmodels.tools.eval_measures import rmse, rmspe
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, precision_recall_curve, auc, roc_curve
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from keras.layers import Dropout
+from keras.layers import Dropout, BatchNormalization
 from keras.callbacks import EarlyStopping
 from keras.regularizers import l2, l1, l1_l2
+from keras.optimizers import Adam
+from sklearn.metrics import accuracy_score, roc_auc_score, precision_recall_curve, auc, classification_report, confusion_matrix
+from keras.models import Sequential
+from keras.layers import Dense, LeakyReLU, Dropout, BatchNormalization
+from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping
+import matplotlib.pyplot as plt
+import torch
+from torch_geometric.data import DataLoader, Data, Batch
+from torch_geometric.nn import GCNConv, global_mean_pool, SAGEConv, GraphConv, Sequential, GeneralConv, GATConv, GlobalAttention, Set2Set, AttentionalAggregation, SAGPooling, TopKPooling, global_add_pool, ASAPooling, GATv2Conv, TransformerConv, HEATConv, GPSConv, summary
+import torch.nn.functional as F
+import tensorflow as tf
+# from tensorflow.keras import layers, models
+# from spektral.layers import GCNConv, GlobalAvgPool
+# from spektral.data import Dataset, Graph
+# from spektral.data.loaders import DisjointLoader
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+import torch
+import random
+from scipy.sparse import coo_matrix
+from torch_geometric import data as loader
+import os
 # from graph_encoding import *
 # from data_preprocessing import *
 
 
 
-# data_1 = read_json_file('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/raw/7CT_s5_v7-7766.json')
-# data_2 = read_json_file('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/raw/7CT_s6_v6-9122.json')
-# data_3 = read_json_file('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/raw/11CT_s5_v13-6106.json')
-# data_4 = read_json_file('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/raw/11CT_s12_v34-6729.json')
-
-
-# ## Print the data form the json file 
-# print("-------------------------------------------------")
-# print("Data from the json file")
-# print("-------------------------------------------------")
-# print(data_1)
-# print("------------------------------------------------- \n")
-# print(data_2)
-# print("------------------------------------------------- \n")
-# print(data_3)
-# print("------------------------------------------------- \n")
-# print(data_4)
-
-
 ### ---------------------------------------------------------------------------
 
 
 #%%#
-### Step-2-feasible classification-node2vec ########################################################
-### Feasible grpah classification - node2vec
-df = pd.read_csv('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/v4_graph_vectors_node2vec_mean_one.csv')
+### Models ######################################################################
 
-## Randomly shuffle the data
-df_new = df.sample(frac=1).reset_index(drop=True)
+## Load the data from the torch file
+feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw/v3_3/'
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw/v3_3/'
 
+feasible_data = []
+infeasible_data = []
 
-## Split the data into train and test
-X = df_new.drop(['label'], axis=1)
-y = df_new['label']
+for file in os.listdir(feasible_data_dir):
+    if file.endswith('.pt'):
+        data = torch.load(feasible_data_dir + file)
+        feasible_data.append(data)
 
+for file in os.listdir(infeasible_data_dir):
+    if file.endswith('.pt'):
+        data = torch.load(infeasible_data_dir + file)
+        infeasible_data.append(data)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-## Standardize the data (mean=0, variance=1)
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-
-## Sequential model
-model = Sequential()
-model.add(Dense(128, input_dim=64, activation='tanh', kernel_regularizer=l1_l2(0.001))) ## LeakyReLU
-model.add(Dense(128, activation='tanh')) ## tanh
-model.add(Dense(128, activation='tanh'))
-model.add(Dense(64, activation='tanh'))
-model.add(Dense(64, activation='tanh'))
-model.add(Dense(32, activation='tanh'))
-model.add(Dense(32, activation='tanh'))
-model.add(Dense(1, activation='sigmoid'))  ## Single neuron for binary classification
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+dataset = feasible_data + infeasible_data
+random.seed(42)
+random.shuffle(dataset)
 
 
-## Training the model
-history = model.fit(X_train, y_train, epochs=200, batch_size=128) ## epoch:200 > 100
+#%%#
+### Adjust some essential components of the dataset ########################################
 
-## Evaluate the model
-y_pred_proba = model.predict(X_test).flatten()
-y_pred = (y_pred_proba > 0.5).astype(int)
 
-accuracy = np.mean(y_pred == y_test)
-cm = confusion_matrix(y_test, y_pred)
-roc_auc = roc_auc_score(y_test, y_pred_proba)
+### ---------------------------------------------------------------------------
 
-print("-----------------------------\n")
-print('Accuracy:', accuracy)
-print("-----------------------------\n")
-print("Classification Report:\n", classification_report(y_test, y_pred))
-print("-----------------------------\n")
-print("Confusion Matrix:\n", cm)
-print("-----------------------------\n")
-print("ROC AUC Score:", roc_auc)
+node_types = []
+for k in range(len(dataset)):
+    cate = dataset[k].x[:, :3]
+    node_type = torch.argmax(cate, dim=1)
+    node_types.append(node_type)
+
+
+## combine the node_type to the dataset
+for i in range(len(dataset)):
+    dataset[i].node_type = node_types[i]
 
 
 
-## Precision-Recall Curve and AUC
-precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
-pr_auc = auc(recall, precision)
-print("Precision-Recall AUC:", pr_auc)
+edge_types = []
+for k in range(len(dataset)):
+    qq = dataset[k].edge_attr
+    edge_type = torch.argmax(qq, dim=1)
+    edge_types.append(edge_type)
 
 
-## Plot Precision-Recall Curve
-plt.figure()
-plt.plot(recall, precision, label=f'PR score = {pr_auc:}')
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall Curve')
-plt.legend()
-plt.show()
-
-## Plot ROC Curve
-fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-plt.figure()
-plt.plot(fpr, tpr, label=f'ROC score = {roc_auc:}')
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('ROC Curve')
-plt.legend()
-plt.show()
+## add edge_type to the dataset
+for i in range(len(dataset)):
+    dataset[i].edge_type = edge_types[i]
 
 
-## Visualize the epoch and loss
-plt.plot(history.history['loss'])
-plt.title('Model Loss')
-plt.ylabel('Loss')
-plt.xlabel('Epoch')
-plt.show()
+ 
+### ---------------------------------------------------------------------------
 
 
-
-
-
-## Recall on 0 label: 0.67 - v4_mean_multi
-## Recall on 0 label: 0.61 - v4_sum_multi
-## Recall on 0 label: 0.75 - v4_mean_one, ROC AUC Score: 0.88
-## Recall on 0 label: 0.71 - v4_sum_one, ROC AUC Score: 0.85
-
-
+## Incase the infeasible datas' y=1
+# y0 = torch.tensor([0], dtype=torch.long)
+# for data in infeasible_data:
+#     data.y = y0
 
 
 ### ---------------------------------------------------------------------------
@@ -168,182 +138,1023 @@ plt.show()
 
 
 
+#%%#
+## Change edge_feature
+for i in range(len(dataset)):
+    ## convert the edge_feature's first element, if value = 10, change it to 1000, and if value = 5, change it to 500, and if value = 1, change it to -1. At first, the edge_feature's first element is 10, 5, 1
+    for j in range(len(dataset[i].edge_feature)):
+        if dataset[i].edge_feature[j][0] == 10:
+            dataset[i].edge_feature[j][0] = 10
+
+        elif dataset[i].edge_feature[j][0] == 8:
+            dataset[i].edge_feature[j][0] = 12
+
+        if dataset[i].edge_feature[j][0] == 1:
+            dataset[i].edge_feature[j][0] = 1
+
+        elif dataset[i].edge_feature[j][0] == 0:
+            dataset[i].edge_feature[j][0] = 0
+
+        elif dataset[i].edge_feature[j][0] == 5:
+            dataset[i].edge_feature[j][0] = 5
+
+
+### ---------------------------------------------------------------------------
+
+
 
 #%%#
-### Step-3-1-structure2vec for GraphClassification #################################################
-df = pd.read_csv('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/v4_graph_vectors_structure2vec_sum.csv')
+## Change edge_weight
+for i in range(len(dataset)):
+    ## convert the edge_feature's first element, if value = 10, change it to 1000, and if value = 5, change it to 500, and if value = 1, change it to -1. At first, the edge_feature's first element is 10, 5, 1
+    for j in range(len(dataset[i].edge_weight)):
+        ## for load
+        if dataset[i].edge_weight[j] == 10:
+            dataset[i].edge_weight[j] = 10
 
-## Randomly shuffle the data
-df_new = df.sample(frac=1).reset_index(drop=True)
+        # ## for unload
+        elif dataset[i].edge_weight[j] == 8:
+            dataset[i].edge_weight[j] = 12
 
+        ## for next
+        if dataset[i].edge_weight[j] == 1:
+            dataset[i].edge_weight[j] = 1
 
-## Split the data into train and test
-X = df_new.drop(['label'], axis=1)
-y = df_new['label']
+        ## for via
+        elif dataset[i].edge_weight[j] == 0:
+            dataset[i].edge_weight[j] = 0
 
+        ## for applicable
+        elif dataset[i].edge_weight[j] == 5:
+            dataset[i].edge_weight[j] = 5
+        
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-
-## Sequential model
-model = Sequential()
-model.add(Dense(2048, input_dim=64, activation='tanh'))
-model.add(Dense(1024, activation='tanh'))
-model.add(Dense(1024, activation='tanh'))
-model.add(Dense(512, activation='tanh'))
-model.add(Dense(512, activation='tanh'))
-model.add(Dense(256, activation='tanh'))
-model.add(Dense(256, activation='tanh'))
-model.add(Dense(128, activation='tanh'))
-model.add(Dense(128, activation='tanh'))
-model.add(Dense(64, activation='tanh'))
-model.add(Dense(64, activation='tanh'))
-model.add(Dense(32, activation='tanh'))
-model.add(Dense(32, activation='tanh'))
-model.add(Dense(16, activation='tanh'))
-model.add(Dense(8, activation='tanh'))
-model.add(Dense(1, activation='sigmoid'))  # Single neuron for binary classification
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-
-
-## Training the model
-model.fit(X_train, y_train, epochs=100, batch_size=64)
-
-
-## Evaluate the model
-y_pred_proba = model.predict(X_test).flatten()
-y_pred = (y_pred_proba > 0.5).astype(int)
-
-## Accuracy, F1 score, Precision, Recall, ROC AUC
-accuracy = np.mean(y_pred == y_test)
-print('Accuracy: %.2f' % (accuracy * 100))
-print("Classification Report:\n", classification_report(y_test, y_pred))
-
-## Confusion matrix
-cm = confusion_matrix(y_test, y_pred)
-print("Confusion Matrix:\n", cm)
-
-## ROC AUC Score
-roc_auc = roc_auc_score(y_test, y_pred_proba)
-print("ROC AUC Score:", roc_auc)
-
-## Precision-Recall Curve and AUC
-precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
-pr_auc = auc(recall, precision)
-print("Precision-Recall AUC:", pr_auc)
-
-
-## Plot Precision-Recall Curve
-plt.figure()
-plt.plot(recall, precision, label=f'PR AUC = {pr_auc:.2f}')
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall Curve')
-plt.legend()
-plt.show()
-
-
-## Plot ROC Curve
-from sklearn.metrics import roc_curve
-fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-plt.figure()
-plt.plot(fpr, tpr, label=f'ROC AUC = {roc_auc:.2f}')
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('ROC Curve')
-plt.legend()
-plt.show()
-
-
+### ---------------------------------------------------------------------------
 
 
 
 
 #%%#
-### Step-3-2-transformer for GraphClassification #################################################
+### Models ######################################################################
 
-df = pd.read_csv('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/v4_graph_vectors_transformer_sum.csv')
-
-## Randomly shuffle the data
-df_new = df.sample(frac=1).reset_index(drop=True)
-
-
-## Split the data into train and test
-X = df_new.drop(['label'], axis=1)
-y = df_new['label']
+## GCN for raw node feature using mean and attention
+class GCN_raw_mean(torch.nn.Module):
+    def __init__(self):
+        super(GCN_raw_mean, self).__init__()
+        self.conv1 = GraphConv(4, 16, aggr='add')
+        self.conv2 = GraphConv(16, 32, aggr='add')
+        self.conv3 = GraphConv(32, 64, aggr='add')
 
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        self.fc1 = torch.nn.Linear(64, 16)  
+
+        self.fc2 = torch.nn.Linear(64, 16)  
+        self.fc3 = torch.nn.Linear(32, 16)
+
+        self.fc4 = torch.nn.Linear(16, 2)  ## Binary classification
+
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        self.bn1 = torch.nn.BatchNorm1d(16)
+        self.bn2 = torch.nn.BatchNorm1d(32)
+        self.bn3 = torch.nn.BatchNorm1d(64)
+
+        self.bn4 = torch.nn.BatchNorm1d(128)
+        self.bn5 = torch.nn.BatchNorm1d(128)
+        self.bn6 = torch.nn.BatchNorm1d(128)
+
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_weight, edge_attr = data.x, data.edge_index, data.edge_weight, data.edge_attr
+        x = self.conv1(x, edge_index, edge_weight=edge_weight)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv2(x, edge_index, edge_weight=edge_weight)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv3(x, edge_index, edge_weight=edge_weight)
+        x = self.bn3(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Neural layers for label classification
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        # x = self.fc2(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
+
+        # x = self.fc3(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
+
+        ## Final layer for label classification
+        x = self.fc4(x)  
+        return F.log_softmax(x, dim=1) ## Log softmax for classification
 
 
-## Sequential model
-## for the activation function, since the value of the vector is very negative and positive, we use the linear activation function, in mean aggregation approach
-model = Sequential()
-model.add(Dense(2048, input_dim=64, activation='linear'))
-model.add(Dense(1024, activation='linear'))
-model.add(Dense(1024, activation='linear'))
-model.add(Dense(512, activation='linear'))
-model.add(Dense(512, activation='linear'))
-model.add(Dense(256, activation='linear'))
-model.add(Dense(256, activation='linear'))
-model.add(Dense(128, activation='linear'))
-model.add(Dense(128, activation='linear'))
-model.add(Dense(64, activation='linear'))
-model.add(Dense(64, activation='linear'))
-model.add(Dense(32, activation='linear'))
-model.add(Dense(32, activation='linear'))
-model.add(Dense(16, activation='linear'))
-model.add(Dense(8, activation='linear'))
-model.add(Dense(1, activation='sigmoid'))  # Single neuron for binary classification
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+class GCN_raw_att(torch.nn.Module):
+    def __init__(self):
+        super(GCN_raw_att, self).__init__()
+        self.conv1 = GraphConv(4, 16, aggr='mean')
+        self.conv2 = GraphConv(16, 32, aggr='mean')
+        self.conv3 = GraphConv(32, 64, aggr='mean')
+
+        self.att_pool = AttentionalAggregation(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(64, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, 1)
+        ))
+
+        self.fc1 = torch.nn.Linear(64, 32)  
+        self.fc2 = torch.nn.Linear(32, 16)  
+
+        self.fc3 = torch.nn.Linear(32, 16)
+
+        self.fc4 = torch.nn.Linear(32, 2)  ## Binary classification
+
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        self.bn1 = torch.nn.LazyBatchNorm1d(16)
+        self.bn2 = torch.nn.LazyBatchNorm1d(32)
+        self.bn3 = torch.nn.LazyBatchNorm1d(64)
+
+        self.bn4 = torch.nn.BatchNorm1d(128)
+        self.bn5 = torch.nn.BatchNorm1d(128)
+        self.bn6 = torch.nn.BatchNorm1d(128)
+
+        self.bn_fc1 = torch.nn.BatchNorm1d(32)
+        self.bn_fc2 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_weight, edge_attr = data.x, data.edge_index, data.edge_weight, data.edge_attr
+
+        edge_index = edge_index.long()
+
+        x = self.conv1(x, edge_index, edge_weight=edge_weight)
+        x = self.bn1(x)
+        x = F.relu(x)
+        # x = self.dropout(x)
+
+        x = self.conv2(x, edge_index, edge_weight=edge_weight)
+        x = self.bn2(x)
+        x = F.relu(x)
+        # x = self.dropout(x)
+
+        x = self.conv3(x, edge_index, edge_weight=edge_weight)
+        # x = self.bn3(x)
+        x = F.relu(x)
+        # x = self.dropout(x)
+
+        ## pooling
+        x = self.att_pool(x, data.batch)
 
 
-## Training the model
-model.fit(X_train, y_train, epochs=500, batch_size=64)
+        ## Neural layers for label classification
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.relu(x)
+        # x = self.dropout(x)
 
-## Evaluate the model
-y_pred_proba = model.predict(X_test).flatten()
-y_pred = (y_pred_proba > 0.5).astype(int)
+        # x = self.fc2(x)
+        # x = self.bn_fc2(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
 
-## Accuracy, F1 score, Precision, Recall, ROC AUC
-accuracy = np.mean(y_pred == y_test)
-print('Accuracy: %.2f' % (accuracy * 100))
-print("Classification Report:\n", classification_report(y_test, y_pred))
+        # x = self.fc3(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
 
-## Confusion matrix
-cm = confusion_matrix(y_test, y_pred)
-print("Confusion Matrix:\n", cm)
-
-## ROC AUC Score
-roc_auc = roc_auc_score(y_test, y_pred_proba)
-print("ROC AUC Score:", roc_auc)
-
-## Precision-Recall Curve and AUC
-precision, recall, _ = precision_recall_curve(y_test, y_pred_proba)
-pr_auc = auc(recall, precision)
-print("Precision-Recall AUC:", pr_auc)
+        ## Final layer for label classification
+        x = self.fc4(x)  
+        return F.log_softmax(x, dim=1) ## Log softmax for classification
 
 
-## Plot Precision-Recall Curve
+
+## GCN for n2v node feature using mean and attention
+class GCN_n2v_att(torch.nn.Module):
+    def __init__(self):
+        super(GCN_n2v_att, self).__init__()
+        self.conv1 = GraphConv(64, 128, aggr='add')
+        self.conv2 = GraphConv(128, 64, aggr='add')
+        self.conv3 = GraphConv(64, 32, aggr='add')
+
+        self.att_pool = GlobalAttention(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(32, 16),
+            torch.nn.ReLU(),
+            torch.nn.Linear(16, 1)
+        ))
+
+        self.fc1 = torch.nn.Linear(32, 16)  
+        self.fc2 = torch.nn.Linear(64, 16)  
+        self.fc3 = torch.nn.Linear(32, 16)
+
+        self.fc4 = torch.nn.Linear(16, 2)  ## Binary classification
+
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        self.bn1 = torch.nn.BatchNorm1d(128)
+        self.bn2 = torch.nn.BatchNorm1d(64)
+        self.bn3 = torch.nn.BatchNorm1d(32)
+
+        self.bn4 = torch.nn.BatchNorm1d(128)
+        self.bn5 = torch.nn.BatchNorm1d(128)
+        self.bn6 = torch.nn.BatchNorm1d(128)
+
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_weight, edge_attr = data.x, data.edge_index, data.edge_weight, data.edge_attr
+        x = self.conv1(x, edge_index, edge_weight=edge_weight)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv2(x, edge_index, edge_weight=edge_weight)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv3(x, edge_index, edge_weight=edge_weight)
+        x = self.bn3(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        ## Global attention pooling to aggregate node features to graph-level features
+        x = self.att_pool(x, data.batch)  
+        
+        ## Neural layers for label classification
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        # x = self.fc2(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
+
+        # x = self.fc3(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
+
+        ## Final layer for label classification
+        x = self.fc4(x)  
+        return F.log_softmax(x, dim=1) ## Log softmax for classification
+
+
+class GCN_n2v_mean(torch.nn.Module):
+    def __init__(self):
+        super(GCN_n2v_mean, self).__init__()
+        self.conv1 = GraphConv(64, 128, aggr='add')
+        self.conv2 = GraphConv(128, 64, aggr='add')
+        self.conv3 = GraphConv(64, 32, aggr='add')
+
+        self.att_pool = GlobalAttention(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(32, 16),
+            torch.nn.ReLU(),
+            torch.nn.Linear(16, 1)
+        ))
+
+        self.fc1 = torch.nn.Linear(32, 16)  
+        self.fc2 = torch.nn.Linear(64, 16)  
+        self.fc3 = torch.nn.Linear(32, 16)
+
+        self.fc4 = torch.nn.Linear(16, 2)  ## Binary classification
+
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        self.bn1 = torch.nn.BatchNorm1d(128)
+        self.bn2 = torch.nn.BatchNorm1d(64)
+        self.bn3 = torch.nn.BatchNorm1d(32)
+
+        self.bn4 = torch.nn.BatchNorm1d(128)
+        self.bn5 = torch.nn.BatchNorm1d(128)
+        self.bn6 = torch.nn.BatchNorm1d(128)
+
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_weight, edge_attr = data.x, data.edge_index, data.edge_weight, data.edge_attr
+        x = self.conv1(x, edge_index, edge_weight=edge_weight)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv2(x, edge_index, edge_weight=edge_weight)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.conv3(x, edge_index, edge_weight=edge_weight)
+        x = self.bn3(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        ## Global attention pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)   
+        
+        ## Neural layers for label classification
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        # x = self.fc2(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
+
+        # x = self.fc3(x)
+        # x = F.relu(x)
+        # x = self.dropout(x)
+
+        ## Final layer for label classification
+        x = self.fc4(x)  
+        return F.log_softmax(x, dim=1) ## Log softmax for classification
+
+
+
+### ---------------------------------------------------------------------------
+
+
+
+## GAT for raw node feature using mean and attention
+class GAT_raw_mean(torch.nn.Module):
+    def __init__(self):
+        super(GAT_raw_mean, self).__init__()
+        self.conv1 = GATConv(4, 16, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATConv(16 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATConv(32 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        # x = self.bn3(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)  
+
+
+class GAT_n2v_mean(torch.nn.Module):
+    def __init__(self):
+        super(GAT_n2v_mean, self).__init__()
+        self.conv1 = GATConv(64, 128, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATConv(128 * 4, 64, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATConv(64 * 4, 32, heads=4, concat=True, edge_dim=6)
+        
+        self.fc1 = torch.nn.Linear(32 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(128 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(64 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(32 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)  
+
+
+## GAT 
+class GAT_raw_att(torch.nn.Module):
+    def __init__(self):
+        super(GAT_raw_att, self).__init__()
+        self.conv1 = GATConv(4, 16, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATConv(16 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATConv(32 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.att_pool = AttentionalAggregation(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(64 * 4, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, 1)
+        ))
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global attention pooling to aggregate node features to graph-level features
+        x = self.att_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)
+        return F.log_softmax(x, dim=1)  ## Log softmax for classification
+
+
+### ---------------------------------------------------------------------------
+
+
+## GATv2 for raw node feature using mean and attention
+class GATv2_raw_mean(torch.nn.Module):
+    def __init__(self):
+        super(GATv2_raw_mean, self).__init__()
+        self.conv1 = GATv2Conv(4, 16, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATv2Conv(16 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATv2Conv(32 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        # x = self.bn3(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
+
+
+class GATv2_raw_att(torch.nn.Module):
+    def __init__(self):
+        super(GATv2_raw_att, self).__init__()
+        self.conv1 = GATv2Conv(4, 16, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATv2Conv(16 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATv2Conv(32 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.att_pool = AttentionalAggregation(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(64 * 4, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, 1)
+        ))
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global attention pooling to aggregate node features to graph-level features
+        x = self.att_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)
+        return F.log_softmax(x, dim=1)  ## Log softmax for classification
+
+
+### ---------------------------------------------------------------------------
+
+## TransformerConv for raw node feature using mean and attention
+class Transformer_raw_mean(torch.nn.Module):
+    def __init__(self):
+        super(Transformer_raw_mean, self).__init__()
+        self.conv1 = TransformerConv(4, 16, heads=4, concat=True, edge_dim=6)
+        self.conv2 = TransformerConv(16 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv3 = TransformerConv(32 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        # x = self.bn3(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
+
+
+class Transformer_raw_att(torch.nn.Module):
+    def __init__(self):
+        super(Transformer_raw_att, self).__init__()
+        self.conv1 = TransformerConv(4, 16, heads=4, concat=True, edge_dim=6)
+        self.conv2 = TransformerConv(16 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv3 = TransformerConv(32 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.att_pool = GlobalAttention(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(64 * 4, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, 1)
+        ))
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global attention pooling to aggregate node features to graph-level features
+        x = self.att_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)
+        return F.log_softmax(x, dim=1)  ## Log softmax for classification
+
+
+
+## HeatConv 
+class HeatConv_raw_mean(torch.nn.Module):
+    def __init__(self):
+        super(HeatConv_raw_mean, self).__init__()
+
+        ## If using edge_attr - one hot encoding(distinguish edge types) - edge_attr_emb_dim = 5, edge_dim = 5
+        ## If using edge_feature - one hot encoding(distinguish edge types) + edge weight - edge_attr_emb_dim = 6, edge_dim = 6
+
+        self.conv1 = HEATConv(4, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+
+        self.conv2 = HEATConv(32, 64, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+
+        self.conv3 = HEATConv(64, 128,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        
+        self.fc1 = torch.nn.Linear(128, 64)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(64, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(32)
+        self.bn2 = torch.nn.BatchNorm1d(64)
+        self.bn3 = torch.nn.BatchNorm1d(128)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature, node_type, edge_type, edge_weight = data.x, data.edge_index, data.edge_attr, data.edge_feature, data.node_type, data.edge_type, data.edge_weight
+
+        ## If using edge_attr - one hot encoding(distinguish edge types) 
+        ## If using edge_feature - one hot encoding(distinguish edge types) + edge weight
+
+        x = self.conv1(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
+
+
+class HeatConv_raw_att(torch.nn.Module):
+    def __init__(self):
+        super(HeatConv_raw_att, self).__init__()
+        self.conv1 = HEATConv(4, 16, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+
+        self.conv2 = HEATConv(16, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+
+        self.conv3 = HEATConv(32, 64,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        
+        self.att_pool = AttentionalAggregation(gate_nn=torch.nn.Sequential(
+            torch.nn.Linear(64, 32),
+            torch.nn.ReLU(),
+            torch.nn.Linear(32, 1)
+        ))
+
+        self.fc1 = torch.nn.Linear(64, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16)
+        self.bn2 = torch.nn.BatchNorm1d(32)
+        self.bn3 = torch.nn.BatchNorm1d(64)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature, node_type, edge_type, edge_weight = data.x, data.edge_index, data.edge_attr, data.edge_feature, data.node_type, data.edge_type, data.edge_weight
+        x = self.conv1(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = self.att_pool(x, data.batch) 
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
+
+
+
+
+#%%#
+### Training ######################################################################
+
+## Initialize model, optimizer, and loss function
+device_1 = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+## Print the device information
+# os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+print(f'Using device: {device}')
+print('---------------------------------------------\n')
+
+
+## Create DataLoaders for training and testing sets
+def create_data_loaders(train_idx, test_idx, dataset, batch_size=128):
+
+    ## Using 20/80 split for training and testing
+    train_subset = [dataset[i] for i in train_idx]
+    test_subset = [dataset[i] for i in test_idx]
+
+    train_loader = loader.DataLoader(train_subset, batch_size=batch_size, shuffle=False)
+    test_loader = loader.DataLoader(test_subset, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
+
+## Training and evaluation functions
+def train(model, optimizer, train_loader):
+    model.train()
+    total_loss = 0
+    for data in train_loader:
+        data = data.to(device)
+        optimizer.zero_grad()
+        output = model(data)
+        loss = criterion(output, data.y) ## Compute the loss using the true labels through CrossEntropyLoss
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+    return total_loss / len(train_loader)
+
+def evaluate(model, loader):
+    model.eval()
+    correct = 0
+    total = 0
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        for data in loader:
+            data = data.to(device)
+            out = model(data)
+            pred = out.argmax(dim=1) ## Select the first class with the highest probability
+            correct += (pred == data.y).sum().item()
+            total += data.y.size(0)
+            all_preds.extend(pred.cpu().numpy())
+            all_labels.extend(data.y.cpu().numpy())
+    return correct / total, all_labels, all_preds
+
+
+## Cross-validation
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+## fold=5 -> 1/5 = 20% for testing, 4/5 = 80% for training
+
+criterion = torch.nn.CrossEntropyLoss()
+
+fold_accuracies = []
+fold_train_accuracies = []
+all_test_labels = []
+all_test_preds = []
+average_false_positive_rate = []
+average_false_negative_rate = []
+
+
+for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
+    print(f'Fold {fold + 1}')
+    print('\n')
+    train_loader, test_loader = create_data_loaders(train_idx, test_idx, dataset)
+    
+
+    ########### ----- Model ------------------------------------------------------------------- ###
+
+
+
+    model_090909 = GCN_raw_att().to(device) ## Traditional GCN with mean polling
+    model_13123123123 = GCN_raw_mean().to(device) ## Traditional GCN with attention pooling
+
+    model_1111 = GAT_raw_mean().to(device) ## GAT model with mean pooling 
+    model_123321 = GAT_raw_att().to(device) ## GAT model with attention pooling
+
+    model_123123123 = GATv2_raw_mean().to(device) ## GATv2 model with mean pooling
+    model___11231 = GATv2_raw_att().to(device) ## GATv2 model with attention pooling
+
+    model_999 = Transformer_raw_mean().to(device) ## Transformer model with mean pooling
+    model_000 = Transformer_raw_att().to(device) ## Transformer model with attention pooling
+
+    model = HeatConv_raw_mean().to(device) ## HeatConv model with mean pooling
+    model_2222 = HeatConv_raw_att().to(device) ## HeatConv model with attention pooling
+
+
+
+    ### ------ Model -------------------------------------------------------------------------- ###
+
+
+    ## Print the current model name
+    print('Model:', model.__class__.__name__)
+    print('---------------------------------------------\n')
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
+    
+    
+    for epoch in range(100):
+        loss = train(model, optimizer, train_loader)
+        if epoch % 10 == 0:
+            print(f'Epoch {epoch} | Loss: {loss:.4f}')
+
+
+    train_accuracy, _, _ = evaluate(model, train_loader)
+    test_accuracy, test_labels, test_preds = evaluate(model, test_loader)
+    
+    fold_train_accuracies.append(train_accuracy)
+    fold_accuracies.append(test_accuracy)
+    all_test_labels.extend(test_labels)
+    all_test_preds.extend(test_preds)
+    
+    print(f'Train Accuracy: {train_accuracy:.4f}')
+    print(f'Test Accuracy: {test_accuracy:.4f}')
+    print('---------------------------------------------\n')
+    ## Confusion Matrix for every fold
+    cm = confusion_matrix(test_labels, test_preds)
+    ## Print the confusion matrix
+    print('Confusion Matrix: \n')
+    print(cm)
+    average_false_positive_rate.append(cm[0][1]/(cm[0][1] + cm[0][0]))
+    average_false_negative_rate.append(cm[1][0]/(cm[1][0] + cm[1][1]))
+    print('---------------------------------------------\n')
+    ## Visulaize the confusion matrix
+    plt.figure()
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.xlabel('Predicted')
+    plt.ylabel('True label')
+    plt.show()
+    print('---------------------------------------------\n')
+
+
+
+## Average accuracies
+print(f'Average Train Accuracy: {np.mean(fold_train_accuracies):.4f}')
+print(f'Average Test Accuracy: {np.mean(fold_accuracies):.4f}')
+print('---------------------------------------------\n')
+
+## Print the average false positive rate and average false negative rate
+print(f'Average False Positive Rate: {np.mean(average_false_positive_rate):.4f}')
+print(f'Average False Negative Rate: {np.mean(average_false_negative_rate):.4f}')
+print('---------------------------------------------\n')
+
+
+## ROC Curve
+fpr, tpr, _ = roc_curve(all_test_labels, all_test_preds)
+roc_auc = auc(fpr, tpr)
+
 plt.figure()
-plt.plot(recall, precision, label=f'PR AUC = {pr_auc:.2f}')
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall Curve')
-plt.legend()
-plt.show()
-
-
-## Plot ROC Curve
-from sklearn.metrics import roc_curve
-fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-plt.figure()
-plt.plot(fpr, tpr, label=f'ROC AUC = {roc_auc:.2f}')
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('ROC Curve')
-plt.legend()
+plt.title('ROC curve')
+plt.legend(loc='lower right')
 plt.show()
+
+
+
+    
+## Save the model
+# torch.save(model.state_dict(), 'gat_model.pth')
+
+
+
+### ---------------------------------------------------------------------------
+
+
+
+
+
 
 
 
