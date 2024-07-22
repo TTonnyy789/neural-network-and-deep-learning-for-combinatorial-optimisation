@@ -190,6 +190,7 @@ def edge_weight_extractor(G):
 
 
 ## Edge_weight matrix using torch_geometric.node2vec one hot encoding for edge attribute
+## TODO: v3_3 -> load, v3_4 and v5 -> load via !!!!!!!!!!!!!!!
 def edge_att_extractor(G):
     ## For attribute in edge, 'action' doing one-hot encoding, there are 'next', 'via', 'load', 'unload', 'applicable'
     ## Build a tensor matrix for the edge feature, store the one-hot encoding for each edge
@@ -199,7 +200,7 @@ def edge_att_extractor(G):
             edge_features.append([1, 0, 0, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'via':
             edge_features.append([0, 1, 0, 0, 0])
-        elif edge_extract(G)[edge][2]['action'] == 'load via': ## v5, v3_4=load via, v3_3=load
+        elif edge_extract(G)[edge][2]['action'] == 'load via': ## v5, v3_4=load via, v3_3=load !!!!!!
             edge_features.append([0, 0, 1, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'unload':
             edge_features.append([0, 0, 0, 1, 0])
@@ -210,6 +211,21 @@ def edge_att_extractor(G):
     return edge_features
 
 
+def edge_att_extractor_v2(G):
+    edge_features = []
+    for edge in range(len(edge_extract(G))):
+        if edge_extract(G)[edge][2]['action'] == 'next':
+            edge_features.append([1, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'load':
+            edge_features.append([0, 1, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'unload':
+            edge_features.append([0, 0, 1])
+    edge_features = torch.tensor(edge_features, dtype=torch.float32)
+    return edge_features
+
+
+
+
 ## Edge_weight matrix using torch_geometric.node2vec one hot encoding for edge feature
 def edge_feature_extractor(G):
     ## Combine edge weight and edge features using torch.cat
@@ -217,6 +233,12 @@ def edge_feature_extractor(G):
     return edge_feature
     
     
+
+
+
+### ---------------------------------------------------------------------------
+
+
 
 ## Node feature matrix for v5
 def node_feature_raw_v5(graph, feature='representation'):
@@ -249,6 +271,18 @@ def node_feature_raw(graph, feature='representation'):
     return node_features
 
 
+def node_feature_raw_v2(graph, feature='representation'):
+    node_features = []
+    for i in range(len(node_extract(graph))):
+        if 'stop' in node_extract(graph)[i][0]:
+            node_features.append([1, 0, node_extract(graph)[i][1][feature]])
+        elif 'v' in node_extract(graph)[i][0] and 'd' not in node_extract(graph)[i][0]:
+            node_features.append([0, 1, node_extract(graph)[i][1][feature]])
+        
+    ## Convert the node into tensor
+    node_features = torch.tensor(node_features, dtype=torch.float32)
+    return node_features
+
 
 ## Node feature matrix using torch_geometric.node2vec, the result should be n-nodes x 64-features
 def node_feature_node2vec(graph):
@@ -257,7 +291,7 @@ def node_feature_node2vec(graph):
     ## Generate the edge_index for the graph
     data = from_networkx(graph)
     ## Learn the node embedding individually
-    model = Node2Vec_2(data.edge_index, embedding_dim=64, walk_length=40,
+    model = Node2Vec_2(data.edge_index, embedding_dim=32, walk_length=40,
                     context_size=15, walks_per_node=25,
                     num_negative_samples=1, p=1, q=1, sparse=True).to(device)
 
@@ -265,16 +299,16 @@ def node_feature_node2vec(graph):
     optimizer = torch.optim.SparseAdam(list(model.parameters()), lr=0.01)
 
     def train():
-        model.train()  # Set the model to training mode
+        model.train()  ## Set the model to training mode
         total_loss = 0
         for pos_rw, neg_rw in tqdm(loader):
-            optimizer.zero_grad()  # Set the gradients to zero
-            loss = model.loss(pos_rw.to(device), neg_rw.to(device))  # Compute the loss for the batch
-            loss.backward()  # Backpropagate the loss
-            optimizer.step()  # Optimize the parameters
+            optimizer.zero_grad()  
+            loss = model.loss(pos_rw.to(device), neg_rw.to(device))  ## Compute the loss for the batch
+            loss.backward()  
+            optimizer.step()  
             total_loss += loss.item()
         return total_loss / len(loader)
-    for epoch in range(1, 31):
+    for epoch in range(1, 71):
         loss = train()
         if epoch % 10 == 0:  # Print loss every 10 epochs
             print(f'Epoch: {epoch:02d}, Loss: {loss:.4f}')
@@ -290,6 +324,12 @@ def node_feature_node2vec(graph):
 
 
 
+### ---------------------------------------------------------------------------
+
+
+
+
+#%%#
 
 if __name__ == '__main__':
     feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
@@ -301,7 +341,7 @@ if __name__ == '__main__':
     for file in os.listdir(feasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(feasible_data_dir, file))
-            G = json_to_graph_v3_4_weight(data)
+            G = json_to_graph_v2_weight(data)
             feasible_graphs.append(G)
 
 
@@ -310,17 +350,14 @@ if __name__ == '__main__':
     for file in os.listdir(infeasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(infeasible_data_dir, file))
-            G = json_to_graph_v3_4_weight(data)
+            G = json_to_graph_v2_weight(data)
             infeasible_graphs.append(G)
 
 
-    # ## Random select 100 feasible solutions
-    # feasible_graphs = np.random.choice(feasible_graphs, 100, replace=False)
 
-
-    ## Extract features for all graphs for both feasible and infeasible graphs
-    ### Using extract_graph_features_v2 for v3_3 and v3_4
-    ### Using extract_graph_features_v3 for v5
+    ## TODO: IMPORTANT !!
+    ## Using extract_graph_features_v2 for v3_3 and v3_4  
+    ## Using extract_graph_features_v3 for v5
     feasible_features_list = [extract_graph_features_v2(graph) for graph in feasible_graphs]
     infeasible_features_list = [extract_graph_features_v2(graph) for graph in infeasible_graphs]
 
@@ -361,9 +398,10 @@ if __name__ == '__main__':
     y0 = torch.tensor([0], dtype=torch.long)
 
 
-    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw/v3_4/'
+    ## Individual embedding data save location
+    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw/v2/'
 
-    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw/v3_4/'
+    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw/v2/'
 
 
     # for idx, graph in enumerate(feasible_graphs):
@@ -380,30 +418,46 @@ if __name__ == '__main__':
 
     
     ##### Save the selected infeasible graphs -----------------------------------------------------
-    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/v5/feasible_graphs.pkl', 'wb') as f:
+    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw/v3_3/feasible_graphs.pkl', 'wb') as f:
         pickle.dump(feasible_graphs, f)
     
 
-    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/v5/selected_graphs.pkl', 'wb') as f:
+
+    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw/v5/selected_graphs.pkl', 'wb') as f:
         pickle.dump(selected_infeasible_graphs, f)
 
 
 
+    ### -----------------------------------------------------------------------------------------
+    ## LOAD 
+
+
     ## Load the selected infeasible graphs
-    # with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/v3_3/selected_graphs.pkl', 'rb') as f:
-    #     selected_infeasible_graphs = pickle.load(f)
+    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/n2v/v3_3/feasible_graphs.pkl', 'rb') as f:
+        feasible_graphs = pickle.load(f)
+
+
+
+    ## Infeasible graphs
+    with open('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/n2v/v3_3/selected_graphs.pkl', 'rb') as f:
+        selected_infeasible_graphs = pickle.load(f)
+
+    
 
     ##### -----------------------------------------------------------------------------------------
 
+    y1 = torch.tensor([1], dtype=torch.long)
+    y0 = torch.tensor([0], dtype=torch.long)
 
     start_idx = 0
     
 
     for idx, graph in enumerate(feasible_graphs[start_idx:], start=start_idx):
-        node_features = node_feature_raw(graph)
+        node_features = node_feature_raw_v2(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
-        edge_att = edge_att_extractor(graph)
+        ## TODO: v2: ewe_v2
+        edge_att = edge_att_extractor_v2(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
         data = Data(x=node_features, edge_index=edge_dd, y=y1, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
@@ -414,10 +468,11 @@ if __name__ == '__main__':
 
     
     for idx, graph in enumerate(selected_infeasible_graphs[start_idx:], start=start_idx):
-        node_features = node_feature_raw(graph)
+        node_features = node_feature_raw_v2(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
-        edge_att = edge_att_extractor(graph)
+        ## TODO: v2: ewe_v2
+        edge_att = edge_att_extractor_v2(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
         data = Data(x=node_features, edge_index=edge_dd, y=y0, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)

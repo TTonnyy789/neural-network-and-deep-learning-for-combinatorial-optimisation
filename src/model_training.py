@@ -45,7 +45,7 @@ from keras.callbacks import EarlyStopping
 import matplotlib.pyplot as plt
 import torch
 from torch_geometric.data import DataLoader, Data, Batch
-from torch_geometric.nn import GCNConv, global_mean_pool, SAGEConv, GraphConv, Sequential, GeneralConv, GATConv, GlobalAttention, Set2Set, AttentionalAggregation, SAGPooling, TopKPooling, global_add_pool, ASAPooling, GATv2Conv, TransformerConv, HEATConv, GPSConv, summary
+from torch_geometric.nn import GCNConv, global_mean_pool, SAGEConv, GraphConv, Sequential, GeneralConv, GATConv, GlobalAttention, Set2Set, AttentionalAggregation, SAGPooling, TopKPooling, global_add_pool, ASAPooling, GATv2Conv, TransformerConv, HEATConv, GPSConv, summary, global_sort_pool, SetTransformerAggregation
 import torch.nn.functional as F
 import tensorflow as tf
 # from tensorflow.keras import layers, models
@@ -92,6 +92,7 @@ random.seed(42)
 random.shuffle(dataset)
 
 
+
 #%%#
 ### Adjust some essential components of the dataset ########################################
 
@@ -100,7 +101,7 @@ random.shuffle(dataset)
 
 node_types = []
 for k in range(len(dataset)):
-    cate = dataset[k].x[:, :3]
+    cate = dataset[k].x[:, :3] ## TODO: if v2 then the [:, :2], other using [:, :3]
     node_type = torch.argmax(cate, dim=1)
     node_types.append(node_type)
 
@@ -537,20 +538,20 @@ class GAT_raw_mean(torch.nn.Module):
 class GAT_n2v_mean(torch.nn.Module):
     def __init__(self):
         super(GAT_n2v_mean, self).__init__()
-        self.conv1 = GATConv(64, 128, heads=4, concat=True, edge_dim=6)
-        self.conv2 = GATConv(128 * 4, 64, heads=4, concat=True, edge_dim=6)
-        self.conv3 = GATConv(64 * 4, 32, heads=4, concat=True, edge_dim=6)
+        self.conv1 = GATConv(32, 64, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATConv(64 * 4, 128, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATConv(128 * 4, 64, heads=4, concat=True, edge_dim=6)
         
-        self.fc1 = torch.nn.Linear(32 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
-        self.fc2 = torch.nn.Linear(16, 2)   
+        self.fc1 = torch.nn.Linear(64 * 4, 32)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(32, 2)   
         
         self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
         
-        self.bn1 = torch.nn.BatchNorm1d(128 * 4)
-        self.bn2 = torch.nn.BatchNorm1d(64 * 4)
-        self.bn3 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn1 = torch.nn.BatchNorm1d(64 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(128 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
         
-        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+        self.bn_fc1 = torch.nn.BatchNorm1d(32)
 
     def forward(self, data):
         x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
@@ -747,7 +748,57 @@ class GATv2_raw_att(torch.nn.Module):
         return F.log_softmax(x, dim=1)  ## Log softmax for classification
 
 
+class GATv2_n2v_mean(torch.nn.Module):
+    def __init__(self):
+        super(GATv2_n2v_mean, self).__init__()
+        self.conv1 = GATv2Conv(32, 64, heads=4, concat=True, edge_dim=6)
+        self.conv2 = GATv2Conv(64 * 4, 128, heads=4, concat=True, edge_dim=6)
+        self.conv3 = GATv2Conv(128 * 4, 64, heads=4, concat=True, edge_dim=6)
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 32)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(32, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(64 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(128 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(32)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
+
+
 ### ---------------------------------------------------------------------------
+
 
 ## TransformerConv for raw node feature using mean and attention
 class Transformer_raw_mean(torch.nn.Module):
@@ -798,6 +849,54 @@ class Transformer_raw_mean(torch.nn.Module):
         x = self.fc2(x)  
         return F.log_softmax(x, dim=1)
 
+
+class Transformer_raw_mean_v2(torch.nn.Module):
+    def __init__(self):
+        super(Transformer_raw_mean_v2, self).__init__()
+        self.conv1 = TransformerConv(3, 16, heads=4, concat=True, edge_dim=4)
+        self.conv2 = TransformerConv(16 * 4, 32, heads=4, concat=True, edge_dim=4)
+        self.conv3 = TransformerConv(32 * 4, 64, heads=4, concat=True, edge_dim=4)
+        
+        self.fc1 = torch.nn.Linear(64 * 4, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(16 * 4)
+        self.bn2 = torch.nn.BatchNorm1d(32 * 4)
+        self.bn3 = torch.nn.BatchNorm1d(64 * 4)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature = data.x, data.edge_index, data.edge_attr, data.edge_feature
+        x = self.conv1(x, edge_index, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        x = self.bn_fc1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
 
 class Transformer_raw_att(torch.nn.Module):
     def __init__(self):
@@ -860,14 +959,71 @@ class HeatConv_raw_mean(torch.nn.Module):
     def __init__(self):
         super(HeatConv_raw_mean, self).__init__()
 
-        ## If using edge_attr - one hot encoding(distinguish edge types) - edge_attr_emb_dim = 5, edge_dim = 5
-        ## If using edge_feature - one hot encoding(distinguish edge types) + edge weight - edge_attr_emb_dim = 6, edge_dim = 6
+        ## edge_type_emb_dim and edge_attr_emb_dim can be any value, this is the parameter for the embedding layer for edge types
 
-        self.conv1 = HEATConv(4, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        self.conv1 = HEATConv(4, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
 
-        self.conv2 = HEATConv(32, 64, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        self.conv2 = HEATConv(32, 64, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
 
-        self.conv3 = HEATConv(64, 128,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        self.conv3 = HEATConv(64, 128,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
+        
+        self.fc1 = torch.nn.Linear(128, 64)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(64, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(32)
+        self.bn2 = torch.nn.BatchNorm1d(64)
+        self.bn3 = torch.nn.BatchNorm1d(128)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature, node_type, edge_type, edge_weight = data.x, data.edge_index, data.edge_attr, data.edge_feature, data.node_type, data.edge_type, data.edge_weight
+
+        ## If using edge_attr - one hot encoding(distinguish edge types) 
+        ## If using edge_feature - one hot encoding(distinguish edge types) + edge weight
+
+        x = self.conv1(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x = global_mean_pool(x, data.batch)  
+        
+        ## Further processing to obtain a 16-dimensional graph-level feature
+        x = self.fc1(x)  
+        # x = self.bn_fc1(x)
+        x = F.elu(x)
+        # x = self.dropout(x)
+        
+        ## Final layer for label classification
+        x = self.fc2(x)  
+        return F.log_softmax(x, dim=1)
+
+
+class HeatConv_raw_mean_v2(torch.nn.Module):
+    def __init__(self):
+        super(HeatConv_raw_mean_v2, self).__init__()
+
+        ## edge_attr_emb_dim can be any value, this is the parameter for the embedding layer for edge types
+
+        self.conv1 = HEATConv(3, 32, num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+
+        self.conv2 = HEATConv(32, 64, num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+
+        self.conv3 = HEATConv(64, 128,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
         
         self.fc1 = torch.nn.Linear(128, 64)  ## Reduce to 16-dimensional graph-level feature
         self.fc2 = torch.nn.Linear(64, 2)   
@@ -918,17 +1074,38 @@ class HeatConv_raw_mean(torch.nn.Module):
 class HeatConv_raw_att(torch.nn.Module):
     def __init__(self):
         super(HeatConv_raw_att, self).__init__()
-        self.conv1 = HEATConv(4, 16, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        self.conv1 = HEATConv(4, 16, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
 
-        self.conv2 = HEATConv(16, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        self.conv2 = HEATConv(16, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
 
-        self.conv3 = HEATConv(32, 64,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        self.conv3 = HEATConv(32, 64,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
         
+
+        ### ------ pooling layer ------------
+
         self.att_pool = AttentionalAggregation(gate_nn=torch.nn.Sequential(
             torch.nn.Linear(64, 32),
             torch.nn.ReLU(),
             torch.nn.Linear(32, 1)
         ))
+
+
+        self.set_transformer_pool = SetTransformerAggregation(
+            channels=64,
+            num_seed_points=1,
+            num_encoder_blocks=1,
+            num_decoder_blocks=1,
+            heads=4,
+            concat=True,
+            dropout=0.0
+        )
+
+        # self.set2set_pool = Set2Set(64, processing_steps=3)
+
+
+
+        ### ------ pooling layer ------------
+
 
         self.fc1 = torch.nn.Linear(64, 16)  ## Reduce to 16-dimensional graph-level feature
         self.fc2 = torch.nn.Linear(16, 2)   
@@ -958,9 +1135,18 @@ class HeatConv_raw_att(torch.nn.Module):
         x = F.elu(x)
         # x = self.dropout(x)
         
+
+        ### ------ pooling layer ------------
+
         ## Global mean pooling to aggregate node features to graph-level features
-        x = self.att_pool(x, data.batch) 
-        
+        # x, edge_index, _, batch, _, _ = self.pool_sag(x, edge_index, batch=data.batch) 
+
+
+        x = self.set_transformer_pool(x, data.batch) 
+
+        ### --------------------------------
+
+
         ## Further processing to obtain a 16-dimensional graph-level feature
         x = self.fc1(x)  
         # x = self.bn_fc1(x)
@@ -972,13 +1158,55 @@ class HeatConv_raw_att(torch.nn.Module):
         return F.log_softmax(x, dim=1)
 
 
+class HEATConv_n2v_mean(torch.nn.Module):
+    def __init__(self):
+        super(HEATConv_n2v_mean, self).__init__()
+        self.conv1 = HEATConv(32, 64, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+
+        self.conv2 = HEATConv(64, 64, num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+
+        self.conv3 = HEATConv(64, 32,  num_node_types=3, num_edge_types=5, edge_type_emb_dim=5, edge_dim=6, edge_attr_emb_dim=6)
+        
+        self.fc1 = torch.nn.Linear(32, 16)  ## Reduce to 16-dimensional graph-level feature
+        self.fc2 = torch.nn.Linear(16, 2)   
+        
+        self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
+        
+        self.bn1 = torch.nn.BatchNorm1d(64)
+        self.bn2 = torch.nn.BatchNorm1d(64)
+        self.bn3 = torch.nn.BatchNorm1d(32)
+        
+        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+    def forward(self, data):
+        x, edge_index, edge_attr, edge_feature, node_type, edge_type, edge_weight = data.x, data.edge_index, data.edge_attr, data.edge_feature, data.node_type, data.edge_type, data.edge_weight
+        x = self.conv1(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn1(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv2(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn2(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        x = self.conv3(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn3(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+        
+        ## Global mean pooling to aggregate node features to graph-level features
+        x
+
+
+
 
 
 #%%#
 ### Training ######################################################################
 
 ## Initialize model, optimizer, and loss function
-device_1 = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+device_123123 = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ## Print the device information
 # os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
@@ -1045,28 +1273,40 @@ average_false_negative_rate = []
 
 for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
     print(f'Fold {fold + 1}')
-    print('\n')
+
     train_loader, test_loader = create_data_loaders(train_idx, test_idx, dataset)
     
 
     ########### ----- Model ------------------------------------------------------------------- ###
 
 
-
+    ## Raw node feature representation
     model_090909 = GCN_raw_att().to(device) ## Traditional GCN with mean polling
     model_13123123123 = GCN_raw_mean().to(device) ## Traditional GCN with attention pooling
 
     model_1111 = GAT_raw_mean().to(device) ## GAT model with mean pooling 
     model_123321 = GAT_raw_att().to(device) ## GAT model with attention pooling
 
+    model_00101 = GAT_n2v_mean().to(device) ## GAT model with mean pooling
+
     model_123123123 = GATv2_raw_mean().to(device) ## GATv2 model with mean pooling
     model___11231 = GATv2_raw_att().to(device) ## GATv2 model with attention pooling
 
-    model_999 = Transformer_raw_mean().to(device) ## Transformer model with mean pooling
+
+    model_123123123 = Transformer_raw_mean().to(device) ## Transformer model with mean pooling
     model_000 = Transformer_raw_att().to(device) ## Transformer model with attention pooling
 
-    model = HeatConv_raw_mean().to(device) ## HeatConv model with mean pooling
-    model_2222 = HeatConv_raw_att().to(device) ## HeatConv model with attention pooling
+    model_1232312312 = Transformer_raw_mean_v2().to(device) ## Transformer model with mean pooling
+
+    model_1231231231231 = HeatConv_raw_mean().to(device) ## HeatConv model with mean pooling
+    model = HeatConv_raw_att().to(device) ## HeatConv model with attention pooling
+
+    model_123123321321321 = HeatConv_raw_mean_v2().to(device) ## HeatConv model with mean pooling
+
+    ## Node2vec node feature 
+    model_12312312 = GATv2_n2v_mean().to(device) ## GATv2 model with mean pooling
+
+    model_12123123 = HEATConv_n2v_mean().to(device) ## HeatConv model with mean pooling
 
 
 
@@ -1074,8 +1314,9 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
 
 
     ## Print the current model name
-    print('Model:', model.__class__.__name__)
     print('---------------------------------------------\n')
+    print('Model:', model.__class__.__name__)
+    print('\n---------------------------------------------\n')
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
     

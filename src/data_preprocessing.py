@@ -736,7 +736,9 @@ def json_to_graph_v6(data):
             G.add_edge('d4d3s' + str(i + 1), 'd4d3d1s' + str(i + 1), action='via')
     return G
 
-### ------------------
+
+### -----------------------------------------------------
+
 
 ## Feature for stop=1000000000 or 1, torch_geometric only support fixed attribute graph
 def json_to_graph_v5_2(data):
@@ -1059,7 +1061,9 @@ def json_to_graph_v3_3(data):
 
 
 
-### ------------------
+### -----------------------------------------------------
+
+
 def json_to_graph_v3_weight(data):
     G = nx.MultiDiGraph()
 
@@ -1306,7 +1310,7 @@ def json_to_graph_v5_weight(data):
     for i in range(len(data['vehicles'])):
         if len(data['transporter']['decks']) == 3:
             G.add_edge('d3v' + str(i + 1), 'd3d2v' + str(i + 1), weight=0, action='via')
-            G.add_edge('d3d2v' + str(i + 1), 'd3d2d1v' + str(i + 1), action='via')
+            G.add_edge('d3d2v' + str(i + 1), 'd3d2d1v' + str(i + 1),weight=0, action='via')
         elif len(data['transporter']['decks']) == 4:
             G.add_edge('d4v' + str(i + 1), 'd4d2v' + str(i + 1), weight=0, action='via')
             G.add_edge('d4d2v' + str(i + 1), 'd4d2d1v' + str(i + 1), weight=0, action='via')
@@ -1317,7 +1321,42 @@ def json_to_graph_v5_weight(data):
 
 
 
+## Pure load and unload relationship graph representation
+def json_to_graph_v2_weight(data):
+    G = nx.MultiDiGraph()
 
+    ## Create nodes including the stops, vehicles, and decks
+    ## Stops
+    for i in range(len(data['route'])):
+        G.add_node('stop' + str(i+1), representation=1) 
+
+    ## Vehicles with the attributes of dimension
+    for vehicle in data['vehicles']:
+        G.add_node(vehicle, representation=data['vehicles'][vehicle]['dimension'])
+
+
+    ## Create the edge between nodes
+    for i in range(1, len(data['route'])):
+        G.add_edge('stop' + str(i), 'stop' + str(i + 1), weight=1, action='next')
+
+    
+    ## load 
+    for index, route in enumerate(data['route'], start=1):
+        if 'load' in route:
+            for vehicle in route['load']:
+                G.add_edge('stop' + str(index), vehicle, weight=10, action='load')
+        if 'unload' in route:
+            for vehicle in route['unload']:
+                G.add_edge(vehicle, 'stop' + str(index), weight=8, action='unload')
+    
+    return G
+
+
+
+
+
+### ------------------------------------------------------------------
+## Graph information extraction
 
 
 ## Create a adjacency matrix from the graph
