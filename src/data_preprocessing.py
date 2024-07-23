@@ -1067,10 +1067,33 @@ def json_to_graph_v3_3(data):
 def json_to_graph_v3_weight(data):
     G = nx.MultiDiGraph()
 
+    ## Initialize the remaining capacity at the start to the total capacity of the transporter
+    total_capacity = data['transporter']['total_capacity']
+    remaining_capacity = total_capacity
+
+    ## Create a list to store the remaining capacities at each stop
+    stops_capacity = []
+
+    # Calculate the remaining capacity at each stop
+    for i, route in enumerate(data['route']):
+        if 'unload' in route:
+            for vehicle in route['unload']:
+                remaining_capacity += data['vehicles'][vehicle]['dimension']
+        if 'load' in route:
+            for vehicle in route['load']:
+                remaining_capacity -= data['vehicles'][vehicle]['dimension']
+        stops_capacity.append(remaining_capacity)
+
     ## Create nodes including the stops, vehicles, and decks
     ## Stops
     for i in range(len(data['route'])):
-        G.add_node('stop' + str(i+1), representation=1)
+        G.add_node('stop' + str(i+1), representation=stops_capacity[i])
+
+
+    ## Create nodes including the stops, vehicles, and decks
+    ## Stops
+    for i in range(len(data['route'])):
+        G.add_node('stop' + str(i+1), representation=stops_capacity[i])
 
     ## Vehicles with the attributes of dimension
     for vehicle in data['vehicles']:
@@ -1117,14 +1140,32 @@ def json_to_graph_v3_weight(data):
     return G
 
 
+
 ## Co-use deck
 def json_to_graph_v3_4_weight(data):
     G = nx.MultiDiGraph()
 
+    ## Initialize the remaining capacity at the start to the total capacity of the transporter
+    total_capacity = data['transporter']['total_capacity']
+    remaining_capacity = total_capacity
+
+    ## Create a list to store the remaining capacities at each stop
+    stops_capacity = []
+
+    # Calculate the remaining capacity at each stop
+    for i, route in enumerate(data['route']):
+        if 'unload' in route:
+            for vehicle in route['unload']:
+                remaining_capacity += data['vehicles'][vehicle]['dimension']
+        if 'load' in route:
+            for vehicle in route['load']:
+                remaining_capacity -= data['vehicles'][vehicle]['dimension']
+        stops_capacity.append(remaining_capacity)
+
     ## Create nodes including the stops, vehicles, and decks
     ## Stops
     for i in range(len(data['route'])):
-        G.add_node('stop' + str(i+1), representation=1)
+        G.add_node('stop' + str(i+1), representation=stops_capacity[i])
 
     ## Vehicles with the attributes of dimension
     for vehicle in data['vehicles']:
@@ -1180,17 +1221,33 @@ def json_to_graph_v3_4_weight(data):
     return G
 
 
+
 ## vehicle oriented deck graph with weight
 def json_to_graph_v5_weight(data):
     G = nx.MultiDiGraph()
 
 
+    ## Initialize the remaining capacity at the start to the total capacity of the transporter
+    total_capacity = data['transporter']['total_capacity']
+    remaining_capacity = total_capacity
+
+    ## Create a list to store the remaining capacities at each stop
+    stops_capacity = []
+
+    # Calculate the remaining capacity at each stop
+    for i, route in enumerate(data['route']):
+        if 'unload' in route:
+            for vehicle in route['unload']:
+                remaining_capacity += data['vehicles'][vehicle]['dimension']
+        if 'load' in route:
+            for vehicle in route['load']:
+                remaining_capacity -= data['vehicles'][vehicle]['dimension']
+        stops_capacity.append(remaining_capacity)
+
     ## Create nodes including the stops, vehicles, and decks
     ## Stops
-    ## For the feature, add the load and unload vehicle in the feature together, if no load or unload, then only add the stop node with the feature of no load and unload
-
     for i in range(len(data['route'])):
-        G.add_node('stop' + str(i+1), representation=1)
+        G.add_node('stop' + str(i+1), representation=stops_capacity[i])
 
 
     ## Vehicles with the attributes of dimension
@@ -1325,10 +1382,27 @@ def json_to_graph_v5_weight(data):
 def json_to_graph_v2_weight(data):
     G = nx.MultiDiGraph()
 
+    ## Initialize the remaining capacity at the start to the total capacity of the transporter
+    total_capacity = data['transporter']['total_capacity']
+    remaining_capacity = total_capacity
+
+    ## Create a list to store the remaining capacities at each stop
+    stops_capacity = []
+
+    # Calculate the remaining capacity at each stop
+    for i, route in enumerate(data['route']):
+        if 'unload' in route:
+            for vehicle in route['unload']:
+                remaining_capacity += data['vehicles'][vehicle]['dimension']
+        if 'load' in route:
+            for vehicle in route['load']:
+                remaining_capacity -= data['vehicles'][vehicle]['dimension']
+        stops_capacity.append(remaining_capacity)
+
     ## Create nodes including the stops, vehicles, and decks
     ## Stops
     for i in range(len(data['route'])):
-        G.add_node('stop' + str(i+1), representation=1) 
+        G.add_node('stop' + str(i+1), representation=stops_capacity[i])
 
     ## Vehicles with the attributes of dimension
     for vehicle in data['vehicles']:
@@ -1351,6 +1425,10 @@ def json_to_graph_v2_weight(data):
     
     return G
 
+
+
+
+### -----------------------------------------------------      
 
 
 

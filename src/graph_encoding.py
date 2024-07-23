@@ -256,6 +256,7 @@ def node_feature_raw_v5(graph, feature='representation'):
     return node_features
     
 
+
 def node_feature_raw(graph, feature='representation'):
     ## do one hot encoding for the node feature using the node name + representation
     node_features = []
@@ -341,7 +342,7 @@ if __name__ == '__main__':
     for file in os.listdir(feasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(feasible_data_dir, file))
-            G = json_to_graph_v2_weight(data)
+            G = json_to_graph_v5_weight(data)
             feasible_graphs.append(G)
 
 
@@ -350,7 +351,7 @@ if __name__ == '__main__':
     for file in os.listdir(infeasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(infeasible_data_dir, file))
-            G = json_to_graph_v2_weight(data)
+            G = json_to_graph_v5_weight(data)
             infeasible_graphs.append(G)
 
 
@@ -358,8 +359,8 @@ if __name__ == '__main__':
     ## TODO: IMPORTANT !!
     ## Using extract_graph_features_v2 for v3_3 and v3_4  
     ## Using extract_graph_features_v3 for v5
-    feasible_features_list = [extract_graph_features_v2(graph) for graph in feasible_graphs]
-    infeasible_features_list = [extract_graph_features_v2(graph) for graph in infeasible_graphs]
+    feasible_features_list = [extract_graph_features_v3(graph) for graph in feasible_graphs]
+    infeasible_features_list = [extract_graph_features_v3(graph) for graph in infeasible_graphs]
 
 
     ## COnvert the list into dataframe
@@ -453,11 +454,13 @@ if __name__ == '__main__':
     
 
     for idx, graph in enumerate(feasible_graphs[start_idx:], start=start_idx):
-        node_features = node_feature_raw_v2(graph)
+        ## TODO: v2: node_feature_raw_v2
+        ## TODO: v5: node_feature_raw_v5
+        node_features = node_feature_raw_v5(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
         ## TODO: v2: ewe_v2
-        edge_att = edge_att_extractor_v2(graph)
+        edge_att = edge_att_extractor(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
         data = Data(x=node_features, edge_index=edge_dd, y=y1, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
@@ -468,11 +471,13 @@ if __name__ == '__main__':
 
     
     for idx, graph in enumerate(selected_infeasible_graphs[start_idx:], start=start_idx):
-        node_features = node_feature_raw_v2(graph)
+        ## TODO: v2: node_feature_raw_v2
+        ## TODO: v5: node_feature_raw_v5
+        node_features = node_feature_raw_v5(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
         ## TODO: v2: ewe_v2
-        edge_att = edge_att_extractor_v2(graph)
+        edge_att = edge_att_extractor(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
         data = Data(x=node_features, edge_index=edge_dd, y=y0, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)

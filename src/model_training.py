@@ -1139,10 +1139,10 @@ class HeatConv_raw_att(torch.nn.Module):
         ### ------ pooling layer ------------
 
         ## Global mean pooling to aggregate node features to graph-level features
-        # x, edge_index, _, batch, _, _ = self.pool_sag(x, edge_index, batch=data.batch) 
 
+        x = self.att_pool(x, data.batch)
 
-        x = self.set_transformer_pool(x, data.batch) 
+        # x = self.set_transformer_pool(x, data.batch) 
 
         ### --------------------------------
 
@@ -1281,7 +1281,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
 
 
     ## Raw node feature representation
-    model_090909 = GCN_raw_att().to(device) ## Traditional GCN with mean polling
+    model = GCN_raw_att().to(device) ## Traditional GCN with mean polling
     model_13123123123 = GCN_raw_mean().to(device) ## Traditional GCN with attention pooling
 
     model_1111 = GAT_raw_mean().to(device) ## GAT model with mean pooling 
@@ -1299,7 +1299,7 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(dataset)):
     model_1232312312 = Transformer_raw_mean_v2().to(device) ## Transformer model with mean pooling
 
     model_1231231231231 = HeatConv_raw_mean().to(device) ## HeatConv model with mean pooling
-    model = HeatConv_raw_att().to(device) ## HeatConv model with attention pooling
+    model_123123 = HeatConv_raw_att().to(device) ## HeatConv model with attention pooling
 
     model_123123321321321 = HeatConv_raw_mean_v2().to(device) ## HeatConv model with mean pooling
 
