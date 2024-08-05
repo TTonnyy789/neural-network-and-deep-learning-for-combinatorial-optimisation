@@ -36,3 +36,7 @@ data/1M_instances/
 
 # Ignore processed data
 data/processed/
+
+
+# Ignore the zip file
+*.zip
