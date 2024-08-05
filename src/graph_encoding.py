@@ -200,7 +200,7 @@ def edge_att_extractor(G):
             edge_features.append([1, 0, 0, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'via':
             edge_features.append([0, 1, 0, 0, 0])
-        elif edge_extract(G)[edge][2]['action'] == 'load via': ## v5, v3_4=load via, v3_3=load !!!!!!
+        elif edge_extract(G)[edge][2]['action'] == 'load': ## v5, v3_4=load via, v3_3=load !!!!!!
             edge_features.append([0, 0, 1, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'unload':
             edge_features.append([0, 0, 0, 1, 0])
@@ -333,16 +333,17 @@ def node_feature_node2vec(graph):
 #%%#
 
 if __name__ == '__main__':
-    feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
+    feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/feasible'
 
-    infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
+    infeasible_data_dir_11 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
 
+    infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/soft'
 
     feasible_graphs = []
     for file in os.listdir(feasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(feasible_data_dir, file))
-            G = json_to_graph_v5_weight(data)
+            G = json_to_graph_v3_weight(data)
             feasible_graphs.append(G)
 
 
@@ -351,7 +352,7 @@ if __name__ == '__main__':
     for file in os.listdir(infeasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(infeasible_data_dir, file))
-            G = json_to_graph_v5_weight(data)
+            G = json_to_graph_v3_weight(data)
             infeasible_graphs.append(G)
 
 
@@ -359,8 +360,9 @@ if __name__ == '__main__':
     ## TODO: IMPORTANT !!
     ## Using extract_graph_features_v2 for v3_3 and v3_4  
     ## Using extract_graph_features_v3 for v5
-    feasible_features_list = [extract_graph_features_v3(graph) for graph in feasible_graphs]
-    infeasible_features_list = [extract_graph_features_v3(graph) for graph in infeasible_graphs]
+
+    feasible_features_list = [extract_graph_features_v2(graph) for graph in feasible_graphs]
+    infeasible_features_list = [extract_graph_features_v2(graph) for graph in infeasible_graphs]
 
 
     ## COnvert the list into dataframe
@@ -390,7 +392,7 @@ if __name__ == '__main__':
 
 
     ## Then select 2610 infeasible graphs from the selected infeasible graphs
-    selected_infeasible_graphs = np.random.choice(selected_infeasible_graphs, 2610, replace=False)
+    selected_infeasible_graphs = np.random.choice(selected_infeasible_graphs, 25935, replace=False)
     selected_infeasible_graphs = selected_infeasible_graphs.tolist()
 
 
@@ -400,9 +402,17 @@ if __name__ == '__main__':
 
 
     ## Individual embedding data save location
-    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw/v2/'
+    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw_1M/v3_3/'
 
-    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw/v2/'
+    ## Google drive save location
+    ## save_dir_feasible = '/Users/ttonny0326/Library/CloudStorage/GoogleDrive-shengyic59@gmail.com/My Drive/Dissertation/data/processed/feasible/raw_1M/v3_3/'
+
+
+    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw_1M/v3_3'
+
+    ## Google drive save location
+    ## save_dir_infeasible = '/Users/ttonny0326/Library/CloudStorage/GoogleDrive-shengyic59@gmail.com/My Drive/Dissertation/data/processed/infeasible/raw_1M/v3_3/'
+
 
 
     # for idx, graph in enumerate(feasible_graphs):
@@ -456,7 +466,7 @@ if __name__ == '__main__':
     for idx, graph in enumerate(feasible_graphs[start_idx:], start=start_idx):
         ## TODO: v2: node_feature_raw_v2
         ## TODO: v5: node_feature_raw_v5
-        node_features = node_feature_raw_v5(graph)
+        node_features = node_feature_raw(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
         ## TODO: v2: ewe_v2
@@ -473,7 +483,7 @@ if __name__ == '__main__':
     for idx, graph in enumerate(selected_infeasible_graphs[start_idx:], start=start_idx):
         ## TODO: v2: node_feature_raw_v2
         ## TODO: v5: node_feature_raw_v5
-        node_features = node_feature_raw_v5(graph)
+        node_features = node_feature_raw(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
         ## TODO: v2: ewe_v2
@@ -496,8 +506,6 @@ if __name__ == '__main__':
     
 
     # ### ---------------------------------------------------------------------------
-
-
 
 
 

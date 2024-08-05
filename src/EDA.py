@@ -94,8 +94,9 @@ for file in os.listdir(infeasible_data_dir):
 
 feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
 
-infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
+infeasible_data_dir_2 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
 
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/soft'
 
 ## Raw json data
 ## FIXME: use this for 'time' calculate
@@ -152,6 +153,7 @@ feasible_graphs = []
 for i in range(len(feasible_graphs_v2)):
     data = json_to_graph_v5(feasible_graphs_v2[i])
     feasible_graphs.append(data)
+
 
 
 infeasible_graphs = []
