@@ -92,11 +92,11 @@ for file in os.listdir(infeasible_data_dir):
 ### Step-2 ######################################################################
 ## Selecting similar graphs
 
-feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/feasible'
+feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/feasible'
 
-infeasible_data_dir_2 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/infeasible'
+infeasible_data_dir_2 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
 
-infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/soft'
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/soft'
 
 ## Raw json data
 ## FIXME: use this for 'time' calculate
@@ -145,20 +145,22 @@ for feasible_feature in feasible_scaled_features:
     remaining_infeasible_features = np.delete(remaining_infeasible_features, closest_idx, axis=0)
 
 # Select 2610 infeasible graphs from the selected infeasible graphs
-selected_infeasible_graphs = np.random.choice(selected_infeasible_graphs, 2610, replace=False)
+selected_infeasible_graphs = np.random.choice(selected_infeasible_graphs, 25935, replace=False)
 selected_infeasible_graphs.tolist()
+
+
 
 # Convert feasible graphs to NetworkX format
 feasible_graphs = []
 for i in range(len(feasible_graphs_v2)):
-    data = json_to_graph_v5(feasible_graphs_v2[i])
+    data = json_to_graph_v5_weight(feasible_graphs_v2[i])
     feasible_graphs.append(data)
 
 
 
 infeasible_graphs = []
 for i in range(len(selected_infeasible_graphs)):
-    data = json_to_graph_v5(selected_infeasible_graphs[i])
+    data = json_to_graph_v5_weight(selected_infeasible_graphs[i])
     infeasible_graphs.append(data)
 
 
@@ -323,6 +325,9 @@ for data in feasible_graphs_v2:
 
 
 
+
+
+
 ### ---------------------------------------------------------------------------------------------
 ## Infeasible graphs' number of nodes, edges, stop nodes, and vehicle nodes
 infeasible_number_of_nodes = []
@@ -449,21 +454,32 @@ positions = [1, 1.5, 3, 3.5]
 
 vp = ax.violinplot([feasible_number_of_nodes, infeasible_number_of_nodes, feasible_number_of_edges, infeasible_number_of_edges], showmeans=True, showmedians=True, positions=positions)
 
-colors = ['blue', 'red', 'blue', 'red']
+colors = ['navy', 'darkorange', 'navy', 'darkorange']
 for i in range(len(vp['bodies'])):
     vp['bodies'][i].set_facecolor(colors[i])
-    
-ax.set_xticks([1.4, 3.4])
-ax.set_xticklabels(['Number of Nodes', 'Number of Edges'])
-ax.set_title('Distribution of the number of nodes and edges')
-ax.set_ylabel('Number of nodes')
-ax.tick_params(axis='x', rotation=45)
+    vp['bodies'][i].set_edgecolor('black')
+    vp['bodies'][i].set_alpha(0.7)
 
-## Add the legend
-custom_lines = [plt.Line2D([0], [0], color='blue', lw=4),
-                plt.Line2D([0], [0], color='red', lw=4)]
-ax.legend(custom_lines, ['Feasible Solution', 'Infeasible Solution'], loc='upper right')
+for partname in ('cbars','cmins','cmaxes'):
+    vp[partname].set_edgecolor('black')
+    vp[partname].set_linewidth(1)
+
+ax.set_xticks([1.25, 3.25])
+ax.set_xticklabels(['Number of Nodes', 'Number of Edges'])
+ax.set_title('Distribution of the Number of Nodes and Edges', fontsize=20, fontweight='bold')
+ax.set_ylabel('Count', fontsize=18)
+ax.tick_params(axis='x', rotation=45, labelsize=12)
+ax.tick_params(axis='y', labelsize=12)
+
+# Add the legend
+custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
+                plt.Line2D([0], [0], color='darkorange', lw=4)]
+ax.legend(custom_lines, ['Feasible Solution', 'Soft Infeasible Solution'], loc='upper right', fontsize=12)
+
+plt.tight_layout()
 plt.show()
+
+
 
 
 
@@ -476,20 +492,29 @@ positions = [1, 1.5, 3, 3.5]
 
 vp = ax.violinplot([feasible_stop_nodes, infeasible_stop_nodes, feasible_vehicle_nodes, infeasible_vehicle_nodes], showmeans=True, showmedians=True, positions=positions)
 
-colors = ['blue', 'red', 'blue', 'red']
+colors = ['navy', 'darkorange', 'navy', 'darkorange']
 for i in range(len(vp['bodies'])):
     vp['bodies'][i].set_facecolor(colors[i])
+    vp['bodies'][i].set_edgecolor('black')
+    vp['bodies'][i].set_alpha(0.7)
 
-ax.set_xticks([1.4, 3.4])
+for partname in ('cbars','cmins','cmaxes'):
+    vp[partname].set_edgecolor('black')
+    vp[partname].set_linewidth(1)
+
+ax.set_xticks([1.25, 3.25])
 ax.set_xticklabels(['Number of stops', 'Number of vehicles'])
-ax.set_title('Distribution of the number of stops and vehicles')
-ax.set_ylabel('Number of nodes')
-ax.tick_params(axis='x', rotation=45)
+ax.set_title('Distribution of the number of stops and vehicles', fontsize=20, fontweight='bold')
+ax.set_ylabel('Number of nodes', fontsize=18)
+ax.tick_params(axis='x', rotation=45, labelsize=12)
+ax.tick_params(axis='y', labelsize=12)
 
-custom_lines = [plt.Line2D([0], [0], color='blue', lw=4),
-                plt.Line2D([0], [0], color='red', lw=4)]
-ax.legend(custom_lines, ['Feasible Solution', 'Infeasible Solution'], loc='upper right')
+custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
+                plt.Line2D([0], [0], color='darkorange', lw=4)]
+ax.legend(custom_lines, ['Feasible Solution', 'Soft Infeasible Solution'], loc='upper right')
 plt.show()
+
+
 
 
 
@@ -501,22 +526,27 @@ positions = [1, 1.5, 3, 3.5]
 
 vp = ax.violinplot([feasible_avg_vehicle_distance, infeasible_avg_vehicle_distance, feasible_std_vehicle_distance, infeasible_std_vehicle_distance], showmeans=True, showmedians=True, positions=positions)
 
-colors = ['blue', 'red', 'blue', 'red']
+colors = ['navy', 'darkorange', 'navy', 'darkorange']
 for i in range(len(vp['bodies'])):
     vp['bodies'][i].set_facecolor(colors[i])
+    vp['bodies'][i].set_edgecolor('black')
+    vp['bodies'][i].set_alpha(0.7)
 
-ax.set_xticks([1.5, 3])
+for partname in ('cbars','cmins','cmaxes'):
+    vp[partname].set_edgecolor('black')
+    vp[partname].set_linewidth(1)
+
+ax.set_xticks([1.25, 3.25])
 ax.set_xticklabels(['Average distance of each vehicle on the deck', 'Std distance of each vehicle on the deck'])
-ax.set_title('Distribution of the average distance and std distance of each vehicle on the deck')
-ax.set_ylabel('Distance')
-ax.tick_params(axis='x', rotation=45)
+ax.set_title('Distribution of the average distance and std distance of each vehicle on the deck', fontsize=20, fontweight='bold')
+ax.set_ylabel('Distance of Stops', fontsize=18)
+ax.tick_params(axis='x', rotation=45, labelsize=12)
+ax.tick_params(axis='y', labelsize=12)
 
-custom_lines = [plt.Line2D([0], [0], color='blue', lw=4),
-                plt.Line2D([0], [0], color='red', lw=4)]
-ax.legend(custom_lines, ['Feasible Solution', 'Infeasible Solution'], loc='upper right')
+custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
+                plt.Line2D([0], [0], color='darkorange', lw=4)]
+ax.legend(custom_lines, ['Feasible Solution', 'Soft Infeasible Solution'], loc='upper right')
 plt.show()
-
-
 
 
 
@@ -527,15 +557,26 @@ plt.style.use('_mpl-gallery')
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 vp = ax.violinplot([feasible_unloading_edges, infeasible_unloading_edges], showmeans=True, showmedians=True)
 
-colors = ['blue', 'red', 'blue', 'red']
+colors = ['navy', 'darkorange', 'navy', 'darkorange']
 for i in range(len(vp['bodies'])):
     vp['bodies'][i].set_facecolor(colors[i])
+    vp['bodies'][i].set_edgecolor('black')
+    vp['bodies'][i].set_alpha(0.7)
+
+for partname in ('cbars','cmins','cmaxes'):
+    vp[partname].set_edgecolor('black')
+    vp[partname].set_linewidth(1)
 
 ax.set_xticks([1, 2])
-ax.set_xticklabels(['# of feasible_unloading_edges', '# of infeasible_unloading_edges'])
-ax.set_title('Distribution of the number of unloading edges')
-ax.set_ylabel('Number of edges')
-ax.tick_params(axis='x', rotation=45)
+ax.set_xticklabels(['Number of unloading in Feasible', 'Number of unloading in Soft Infeasible'])
+ax.set_title('Distribution of the number of unloading edges', fontsize=20, fontweight='bold')
+ax.set_ylabel('Number of edges', fontsize=18)
+ax.tick_params(axis='x', rotation=45, labelsize=12)
+ax.tick_params(axis='y', labelsize=12)
+
+custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
+                plt.Line2D([0], [0], color='darkorange', lw=4)]
+ax.legend(custom_lines, ['Feasible Solution', 'Soft Infeasible Solution'], loc='upper right')
 plt.show()
 
 

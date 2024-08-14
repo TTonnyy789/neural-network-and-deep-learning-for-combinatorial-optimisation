@@ -335,7 +335,7 @@ def node_feature_node2vec(graph):
 if __name__ == '__main__':
     feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/feasible'
 
-    infeasible_data_dir_11 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
+    # infeasible_data_dir_11 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
 
     infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/soft'
 
@@ -343,7 +343,7 @@ if __name__ == '__main__':
     for file in os.listdir(feasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(feasible_data_dir, file))
-            G = json_to_graph_v3_weight(data)
+            G = json_to_graph_v2_weight(data)
             feasible_graphs.append(G)
 
 
@@ -352,13 +352,13 @@ if __name__ == '__main__':
     for file in os.listdir(infeasible_data_dir):
         if file.endswith('.json') and 'solution' not in file:
             data = read_json_file(os.path.join(infeasible_data_dir, file))
-            G = json_to_graph_v3_weight(data)
+            G = json_to_graph_v2_weight(data)
             infeasible_graphs.append(G)
 
 
 
     ## TODO: IMPORTANT !!
-    ## Using extract_graph_features_v2 for v3_3 and v3_4  
+    ## Using extract_graph_features_v2 for v3_3, v3_4, and v2
     ## Using extract_graph_features_v3 for v5
 
     feasible_features_list = [extract_graph_features_v2(graph) for graph in feasible_graphs]
@@ -402,13 +402,13 @@ if __name__ == '__main__':
 
 
     ## Individual embedding data save location
-    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw_1M/v3_3/'
+    save_dir_feasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/feasible/raw_1M/v2/'
 
     ## Google drive save location
     ## save_dir_feasible = '/Users/ttonny0326/Library/CloudStorage/GoogleDrive-shengyic59@gmail.com/My Drive/Dissertation/data/processed/feasible/raw_1M/v3_3/'
 
 
-    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw_1M/v3_3'
+    save_dir_infeasible = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/infeasible/raw_1M/v2/'
 
     ## Google drive save location
     ## save_dir_infeasible = '/Users/ttonny0326/Library/CloudStorage/GoogleDrive-shengyic59@gmail.com/My Drive/Dissertation/data/processed/infeasible/raw_1M/v3_3/'
@@ -466,11 +466,11 @@ if __name__ == '__main__':
     for idx, graph in enumerate(feasible_graphs[start_idx:], start=start_idx):
         ## TODO: v2: node_feature_raw_v2
         ## TODO: v5: node_feature_raw_v5
-        node_features = node_feature_raw(graph)
+        node_features = node_feature_raw_v2(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
         ## TODO: v2: ewe_v2
-        edge_att = edge_att_extractor(graph)
+        edge_att = edge_att_extractor_v2(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
         data = Data(x=node_features, edge_index=edge_dd, y=y1, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
@@ -483,11 +483,11 @@ if __name__ == '__main__':
     for idx, graph in enumerate(selected_infeasible_graphs[start_idx:], start=start_idx):
         ## TODO: v2: node_feature_raw_v2
         ## TODO: v5: node_feature_raw_v5
-        node_features = node_feature_raw(graph)
+        node_features = node_feature_raw_v2(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
         ## TODO: v2: ewe_v2
-        edge_att = edge_att_extractor(graph)
+        edge_att = edge_att_extractor_v2(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
         data = Data(x=node_features, edge_index=edge_dd, y=y0, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature)
@@ -505,7 +505,7 @@ if __name__ == '__main__':
     
     
 
-    # ### ---------------------------------------------------------------------------
+    ### ---------------------------------------------------------------------------
 
 
 
