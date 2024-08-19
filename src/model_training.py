@@ -1500,7 +1500,7 @@ class HeatConv_raw_mean(torch.nn.Module):
 class HeatConv_raw_att(torch.nn.Module):
     def __init__(self):
         super(HeatConv_raw_att, self).__init__()
-        
+
         self.conv1 = HEATConv(4, 32, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
 
         self.conv2 = HEATConv(32, 64, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
@@ -1515,7 +1515,7 @@ class HeatConv_raw_att(torch.nn.Module):
 
         self.conv7 = HEATConv(256, 128, num_node_types=3, num_edge_types=5, edge_type_emb_dim=16, edge_dim=6, edge_attr_emb_dim=16)
 
-    
+
 
         ### ------ pooling layer ------------
 
@@ -1549,17 +1549,17 @@ class HeatConv_raw_att(torch.nn.Module):
         self.fc2 = torch.nn.Linear(64, 32)
         self.fc3 = torch.nn.Linear(32, 16)
         self.fc4 = torch.nn.Linear(16, 2)
-        
+
         self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
 
-        self.bn1 = torch.nn.BatchNorm1d(32)
-        self.bn2 = torch.nn.BatchNorm1d(64)
-        self.bn3 = torch.nn.BatchNorm1d(128)
-        self.bn4 = torch.nn.BatchNorm1d(256)
-        self.bn5 = torch.nn.BatchNorm1d(512)
-        self.bn6 = torch.nn.BatchNorm1d(256)
-        self.bn7 = torch.nn.BatchNorm1d(128)
-        
+        self.bn1 = GraphNorm(32)
+        self.bn2 = GraphNorm(64)
+        self.bn3 = GraphNorm(128)
+        self.bn4 = GraphNorm(256)
+        self.bn5 = GraphNorm(512)
+        self.bn6 = GraphNorm(256)
+        self.bn7 = GraphNorm(128)
+
         self.bn_fc1 = torch.nn.BatchNorm1d(64)
         self.bn_fc2 = torch.nn.BatchNorm1d(32)
         self.bn_fc3 = torch.nn.BatchNorm1d(16)
@@ -1572,12 +1572,12 @@ class HeatConv_raw_att(torch.nn.Module):
         x = self.bn1(x)
         x = F.elu(x)
         x = self.dropout(x)
-        
+
         x = self.conv2(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
         x = self.bn2(x)
         x = F.elu(x)
         x = self.dropout(x)
-        
+
         x = self.conv3(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
         x = self.bn3(x)
         x = F.elu(x)
@@ -1603,25 +1603,25 @@ class HeatConv_raw_att(torch.nn.Module):
         x = F.elu(x)
         x = self.dropout(x)
 
-        
+
 
         ### ------ pooling layer ------------
 
         ## Global mean pooling to aggregate node features to graph-level features
 
-        # x = self.att_pool(x, data.batch)
+        x = self.att_pool(x, data.batch)
 
-        x, edge_index, _, batch, _, _ = self.sag_pool(x, edge_index, None, batch=data.batch)
+        # x, edge_index, _, batch, _, _ = self.sag_pool(x, edge_index, None, batch=data.batch)
 
-        x = global_mean_pool(x, batch)
+        # x = global_mean_pool(x, batch)
 
-        # x = self.set_transformer_pool(x, data.batch) 
+        # x = self.set_transformer_pool(x, data.batch)
 
         ### --------------------------------
 
 
         ## Further processing to obtain a graph-level feature
-        x = self.fc1(x)  
+        x = self.fc1(x)
         x = self.bn_fc1(x)
         x = F.elu(x)
 
@@ -1634,9 +1634,8 @@ class HeatConv_raw_att(torch.nn.Module):
         x = F.elu(x)
 
         ## Final layer for label classification
-        x = self.fc4(x)  
+        x = self.fc4(x)
         return F.log_softmax(x, dim=1)
-
 
 
 ## v2: for json to graph v2 weight
@@ -1702,70 +1701,140 @@ class HeatConv_raw_att_v2(torch.nn.Module):
     def __init__(self):
         super(HeatConv_raw_att_v2, self).__init__()
 
-        ## edge_attr_emb_dim can be any value, this is the parameter for the embedding layer for edge types
+        self.conv1 = HEATConv(3, 32,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
 
-        self.conv1 = HEATConv(3, 32, num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
-
-        self.conv2 = HEATConv(32, 64, num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+        self.conv2 = HEATConv(32, 64,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
 
         self.conv3 = HEATConv(64, 128,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
-        
+
+        self.conv4 = HEATConv(128, 256,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+
+        self.conv5 = HEATConv(256, 512,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+
+        self.conv6 = HEATConv(512, 256,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+
+        self.conv7 = HEATConv(256, 128,  num_node_types=2, num_edge_types=3, edge_type_emb_dim=3, edge_dim=4, edge_attr_emb_dim=6)
+
+
+
+        ### ------ pooling layer ------------
+
+
         self.att_pool = AttentionalAggregation(gate_nn=torch.nn.Sequential(
             torch.nn.Linear(128, 64),
             torch.nn.ReLU(),
             torch.nn.Linear(64, 1)
         ))
-        
+
+
+        self.set_transformer_pool = SetTransformerAggregation(
+            channels=128,
+            num_seed_points=1,
+            num_encoder_blocks=1,
+            num_decoder_blocks=1,
+            heads=4,
+            concat=True,
+            dropout=0.1
+        )
+
+        self.sag_pool = SAGPooling(128, ratio=0.5, GNN=GraphConv)
+
+        # self.set2set_pool = Set2Set(64, processing_steps=3)
+
+
+        ### ------ pooling layer ------------
+
+
         self.fc1 = torch.nn.Linear(128, 64)  ## Reduce to 16-dimensional graph-level feature
-        self.fc2 = torch.nn.Linear(64, 2)   
-        
+        self.fc2 = torch.nn.Linear(64, 32)
+        self.fc3 = torch.nn.Linear(32, 16)
+        self.fc4 = torch.nn.Linear(16, 2)
+
         self.dropout = torch.nn.Dropout(p=0.5)  ## Dropout layer with 50% dropout rate
-        
-        self.bn1 = torch.nn.BatchNorm1d(32)
-        self.bn2 = torch.nn.BatchNorm1d(64)
-        self.bn3 = torch.nn.BatchNorm1d(128)
-        
-        self.bn_fc1 = torch.nn.BatchNorm1d(16)
+
+        self.bn1 = GraphNorm(32)
+        self.bn2 = GraphNorm(64)
+        self.bn3 = GraphNorm(128)
+        self.bn4 = GraphNorm(256)
+        self.bn5 = GraphNorm(512)
+        self.bn6 = GraphNorm(256)
+        self.bn7 = GraphNorm(128)
+
+        self.bn_fc1 = torch.nn.BatchNorm1d(64)
+        self.bn_fc2 = torch.nn.BatchNorm1d(32)
+        self.bn_fc3 = torch.nn.BatchNorm1d(16)
 
     def forward(self, data):
-        x, edge_index, edge_attr, edge_feature, node_type, edge_type, edge_weight = data.x, data.edge_index, data.edge_attr, data.edge_feature, data.node_type, data.edge_type, data.edge_weight
-
-        ## If using edge_attr - one hot encoding(distinguish edge types) 
-        ## If using edge_feature - one hot encoding(distinguish edge types) + edge weight
+        x, edge_index, edge_attr, edge_feature, node_type, edge_type, edge_weight = \
+            data.x, data.edge_index, data.edge_attr, data.edge_feature, data.node_type, data.edge_type, data.edge_weight
 
         x = self.conv1(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
         x = self.bn1(x)
         x = F.elu(x)
-        # x = self.dropout(x)
-        
+        x = self.dropout(x)
+
         x = self.conv2(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
         x = self.bn2(x)
         x = F.elu(x)
-        # x = self.dropout(x)
+        x = self.dropout(x)
 
         x = self.conv3(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
         x = self.bn3(x)
         x = F.elu(x)
-        # x = self.dropout(x)
+        x = self.dropout(x)
+
+        x = self.conv4(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn4(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+
+        x = self.conv5(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn5(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+
+        x = self.conv6(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn6(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+
+        x = self.conv7(x, edge_index, node_type=node_type, edge_type=edge_type, edge_attr=edge_feature)
+        x = self.bn7(x)
+        x = F.elu(x)
+        x = self.dropout(x)
+
+
 
         ### ------ pooling layer ------------
 
-        ## Global attention pooling to aggregate node features to graph-level features
-        x = self.att_pool(x, data.batch)
-
         ## Global mean pooling to aggregate node features to graph-level features
+
+        # x = self.att_pool(x, data.batch)
+
+        # x, edge_index, _, batch, _, _ = self.sag_pool(x, edge_index, None, batch=data.batch)
+
         # x = global_mean_pool(x, data.batch)
+
+        x = self.set_transformer_pool(x, data.batch)
 
         ### --------------------------------
 
-        ## Further processing to obtain a 16-dimensional graph-level feature
+
+        ## Further processing to obtain a graph-level feature
         x = self.fc1(x)
-        # x = self.bn_fc1(x)
+        x = self.bn_fc1(x)
         x = F.elu(x)
-        # x = self.dropout(x)
+
+        x = self.fc2(x)
+        x = self.bn_fc2(x)
+        x = F.elu(x)
+
+        x = self.fc3(x)
+        x = self.bn_fc3(x)
+        x = F.elu(x)
 
         ## Final layer for label classification
-        x = self.fc2(x)
+        x = self.fc4(x)
         return F.log_softmax(x, dim=1)
     
 
@@ -2088,7 +2157,7 @@ plt.show()
 
 feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/feasible'
 
-infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/soft'
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
 
 # infeasible_data_dir_12 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/soft'
 
@@ -2111,8 +2180,10 @@ for i in range(soft_infeasible.shape[0]):
 ### Time testing for feasible instances ########################################
 
 ## Load the model using torch
-model = torch.load('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/models/v3_3_HEAT_att.pth', map_location=torch.device('cpu'))
+model = torch.load('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/models/v5_HEAT_att_late.pth', map_location=torch.device('cpu'))
 
+## Summary of the model
+print(model)
 
 
 
@@ -2127,44 +2198,57 @@ for file in os.listdir(infeasible_data_dir):
 
 
 ## Exclude the soft infeasible instances from the infeasible instances
-# infeasible_instances = [i for i in infeasible_graphs if i not in soft_infeasible_instances]
+infeasible_instances = [i for i in infeasible_graphs if i not in soft_infeasible_instances]
 
-test_100 = infeasible_graphs[:100]
+
+test_100 = infeasible_instances[:15000]
 
 y0 = torch.tensor([0], dtype=torch.long)
 
 
 ## TODO: Before test on v3_3, remember to change the 'load via' into 'load' in the edge_att_extractor function !!!!! Verse versa for v3_4, and v5
 
-for i in infeasible_graphs:
+processing_times = []
+output = []
 
-    start_time = time.time()
+for i in test_100:
+
+    
     json_data = read_json_file(os.path.join(infeasible_data_dir, i))
-    graph = json_to_graph_v3_weight(json_data)
 
-    node_features = node_feature_raw(graph)
+    graph = json_to_graph_v5_weight(json_data)
+
+    ## TODO: v2: node_feature_raw_v2
+    ## TODO: v5: node_feature_raw_v5
+    ## TODO: v3_3 & v3_4: node_feature_raw
+    node_features = node_feature_raw_v5(graph)
+
     edge_dd = edge_index_extractor(graph)
     edge_we = edge_weight_extractor(graph)
+
+    ## TODO: v2: edge_att_extractor_v2
+    ## TODO: v3: edge_att_extractor_v3
+    ## TODO: v5 & v3_4: edge_att_extractor
     edge_att = edge_att_extractor(graph)
 
     edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
+
+    ## TODO: v2: torch.argmax(node_features[:, :2], dim=1)   
     node_type = torch.argmax(node_features[:, :3], dim=1)  
     edge_type = torch.argmax(edge_att, dim=1) 
 
     data = Data(x=node_features, edge_index=edge_dd, y=y0, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature, node_type=node_type, edge_type=edge_type)
     
-
     try:
+        start_time = time.time()
         out = model(data)
+        end_time = time.time()
         pred = out.argmax(dim=1)
     except Exception as e:
         print(f"Error during model forward pass: {e}")
         continue
 
-
-    ## End time
-    end_time = time.time()
 
     output.append(pred)
 
@@ -2173,11 +2257,10 @@ for i in infeasible_graphs:
 
 
 ## Vilsualise the distribution of prediction times 
-plt.style.use('_mpl-gallery')
-plt.figure()
+plt.figure(figsize=(10, 6))  # Increase the figure size
 sns.boxplot(x=processing_times, color='darkorange')
-plt.xlabel('Prediction Time (seconds)')
-plt.title('Distribution of Pre-processing + Prediction Times per Input')
+plt.xlabel('Prediction Time (seconds)', fontsize=14)  # Increase the font size of the labels
+plt.title('Distribution of Pre-processing + Prediction Times per Input', fontsize=16)  # Increase the font size of the title
 plt.show()
 
 
@@ -2191,11 +2274,32 @@ print(f'Output Accuracy: {output_accuracy:.4f}')
 
 ### ---------------------------------------------------------------------------
 
+
 ## Select those output is not 0
-output_1 = [i for i in output if i != 0]
+# output_1 = [i for i in output if i != 0]
 
 
 
+#%%#
 
 
-# %%
+## Store all processing times and plot the distribution
+processing_times = np.array(processing_times)
+processing_times_1 = processing_times[output != 0]
+
+plt.style.use('_mpl-gallery')
+plt.figure()
+sns.boxplot(x=processing_times_1, color='darkorange')
+plt.xlabel('Prediction Time (seconds)')
+plt.title('Distribution of Pre-processing + Prediction Times per Input')
+plt.show()
+
+## Save the processing times using this current model across all infeasible instances(unseen) as Excel file
+df = pd.DataFrame(processing_times)
+df.to_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v2_HEAT_att_late.xlsx')
+
+
+### ---------------------------------------------------------------------------
+
+
+##%%#

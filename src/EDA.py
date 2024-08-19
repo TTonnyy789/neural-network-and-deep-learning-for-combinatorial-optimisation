@@ -19,6 +19,10 @@ import torch.nn.functional as F
 from torch.optim import Adam
 from karateclub import FeatherGraph
 from sklearn.model_selection import train_test_split
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
 from data_preprocessing import *
 from graph_encoding import *
 
@@ -466,9 +470,10 @@ for partname in ('cbars','cmins','cmaxes'):
 
 ax.set_xticks([1.25, 3.25])
 ax.set_xticklabels(['Number of Nodes', 'Number of Edges'])
-ax.set_title('Distribution of the Number of Nodes and Edges', fontsize=20, fontweight='bold')
-ax.set_ylabel('Count', fontsize=18)
-ax.tick_params(axis='x', rotation=45, labelsize=12)
+# ax.set_title('Distribution of the Number of Nodes and Edges', fontsize=20, fontweight='bold')
+ax.set_ylabel('Count', fontsize=20)
+
+ax.tick_params(axis='x', labelsize=18)
 ax.tick_params(axis='y', labelsize=12)
 
 # Add the legend
@@ -504,9 +509,10 @@ for partname in ('cbars','cmins','cmaxes'):
 
 ax.set_xticks([1.25, 3.25])
 ax.set_xticklabels(['Number of stops', 'Number of vehicles'])
-ax.set_title('Distribution of the number of stops and vehicles', fontsize=20, fontweight='bold')
-ax.set_ylabel('Number of nodes', fontsize=18)
-ax.tick_params(axis='x', rotation=45, labelsize=12)
+# ax.set_title('Distribution of the number of stops and vehicles', fontsize=20, fontweight='bold')
+ax.set_ylabel('Number of nodes', fontsize=20)
+
+ax.tick_params(axis='x', labelsize=18)
 ax.tick_params(axis='y', labelsize=12)
 
 custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
@@ -538,9 +544,10 @@ for partname in ('cbars','cmins','cmaxes'):
 
 ax.set_xticks([1.25, 3.25])
 ax.set_xticklabels(['Average distance of each vehicle on the deck', 'Std distance of each vehicle on the deck'])
-ax.set_title('Distribution of the average distance and std distance of each vehicle on the deck', fontsize=20, fontweight='bold')
-ax.set_ylabel('Distance of Stops', fontsize=18)
-ax.tick_params(axis='x', rotation=45, labelsize=12)
+# ax.set_title('Distribution of the average distance and std distance of each vehicle on the deck', fontsize=20, fontweight='bold')
+ax.set_ylabel('Distance of Stops', fontsize=20)
+
+ax.tick_params(axis='x', rotation=45, labelsize=18)
 ax.tick_params(axis='y', labelsize=12)
 
 custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
@@ -569,9 +576,10 @@ for partname in ('cbars','cmins','cmaxes'):
 
 ax.set_xticks([1, 2])
 ax.set_xticklabels(['Number of unloading in Feasible', 'Number of unloading in Soft Infeasible'])
-ax.set_title('Distribution of the number of unloading edges', fontsize=20, fontweight='bold')
-ax.set_ylabel('Number of edges', fontsize=18)
-ax.tick_params(axis='x', rotation=45, labelsize=12)
+# ax.set_title('Distribution of the number of unloading edges', fontsize=20, fontweight='bold')
+ax.set_ylabel('Number of edges', fontsize=20)
+
+ax.tick_params(axis='x', rotation=45,labelsize=18)
 ax.tick_params(axis='y', labelsize=12)
 
 custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
@@ -623,6 +631,340 @@ ax.set_title('Distribution of the average number of loaded vehicles in each stop
 ax.set_ylabel('Number of vehicles')
 ax.tick_params(axis='x', rotation=45)
 plt.show()
+
+
+
+# %%
+
+
+#%%#
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Data from the provided table
+data = {
+    'Basic': {
+        'Accuracy': 0.85353769,
+        'Precision': 0.87902097,
+        'Recall': 0.82039439,
+        'F1 Score': 0.84830046,
+        'FPR': 0.1133573,
+        'FNR': 0.1796066
+    },
+    'Deck Assign': {
+        'Accuracy': 0.84705142,
+        'Precision': 0.85399136,
+        'Recall': 0.85828393,
+        'F1 Score': 0.85603938,
+        'FPR': 0.13034936,
+        'FNR': 0.14171017
+    },
+    'Deck Co-use': {
+        'Accuracy': 0.81642334,
+        'Precision': 0.83232339,
+        'Recall': 0.79118745,
+        'F1 Score': 0.81159574,
+        'FPR': 0.15835528,
+        'FNR': 0.20881253
+    },
+    'Hierarchical': {
+        'Accuracy': 0.86221323,
+        'Precision': 0.85665691,
+        'Recall': 0.87024394,
+        'F1 Score': 0.86328133,
+        'FPR': 0.14572944,
+        'FNR': 0.12975064
+    }
+}
+
+# Extract the metrics and the graph representations
+metrics = ['Accuracy', 'Precision', 'Recall', 'F1 Score', 'FPR', 'FNR']
+graph_representations = list(data.keys())
+
+# Set custom y-axis limits for different metrics
+y_limits = {
+    'Accuracy': (0.7, 0.9),
+    'Precision': (0.7, 0.9),
+    'Recall': (0.7, 0.9),
+    'F1 Score': (0.7, 0.9),
+    'FPR': (0.1, 0.2),
+    'FNR': (0.1, 0.3)
+}
+
+# Create a bar chart for each metric
+fig, axs = plt.subplots(3, 2, figsize=(12, 15))
+axs = axs.flatten()
+
+for i, metric in enumerate(metrics):
+    values = [data[graph][metric] for graph in graph_representations]
+    axs[i].bar(graph_representations, values, color='navy')
+    axs[i].set_title(f'cv- {metric} Comparison')
+    axs[i].set_ylim(y_limits[metric])
+    for j, val in enumerate(values):
+        axs[i].text(j, val + 0.002, f'{val:.4f}', ha='center', va='bottom')
+    axs[i].set_ylabel(metric)
+    axs[i].set_xlabel('Graph Representations')
+
+plt.tight_layout()
+plt.show()
+
+
+
+#%%#
+### ROC-AUC curve and Precision-Recall curve ####################################################
+
+
+# Define the absolute file paths and labels for each graph representation
+file_names = [
+    '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed//performance_matrix/roc_pr_data_v2.npz',
+    '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/performance_matrix/roc_pr_data_v3_3.npz',
+    '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/performance_matrix/roc_pr_data_v3_4.npz',
+    '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/performance_matrix/roc_pr_data_v5.npz'
+]
+
+labels = ['Basic', 'Deck Assign', 'Deck Co-use', 'Hierarchical']  # Adjust these labels as needed
+colors = ['navy', 'darkorange', 'green', 'red']  # Define different colors for the lines
+
+# Initialize lists to store data for plotting
+roc_curves = []
+pr_curves = []
+roc_aucs = []
+pr_aucs = []
+
+# Load data and compute curves for each file
+for file_name, label in zip(file_names, labels):
+    data = np.load(file_name, allow_pickle=True)
+    true_labels = data['true_labels']
+    pred_probs = data['pred_probs']
+
+    # Compute ROC curve and AUC
+    fpr, tpr, _ = roc_curve(true_labels, pred_probs)
+    roc_auc = auc(fpr, tpr)
+    roc_curves.append((fpr, tpr))
+    roc_aucs.append(roc_auc)
+
+    # Compute Precision-Recall curve and AUC
+    precision, recall, _ = precision_recall_curve(true_labels, pred_probs)
+    pr_auc = auc(recall, precision)
+    pr_curves.append((precision, recall))
+    pr_aucs.append(pr_auc)
+
+    data.close()
+
+# Plot ROC-AUC curves
+plt.figure(figsize=(10, 8))
+for i, (fpr, tpr) in enumerate(roc_curves):
+    plt.plot(fpr, tpr, label=f'{labels[i]} (AUC = {roc_aucs[i]:.2f})', color=colors[i], linewidth=2)
+
+plt.plot([0, 1], [0, 1], color='navy', linestyle='--', linewidth=1.5)
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate', fontsize=18)
+plt.ylabel('True Positive Rate', fontsize=18)
+# plt.title('ROC-AUC Curves for Different Graph Representations', fontsize=16)
+plt.legend(loc='lower right', fontsize=12)
+plt.grid(True, linestyle='--', linewidth=0.5)
+plt.tight_layout()
+plt.show()
+
+# Plot Precision-Recall curves
+plt.figure(figsize=(10, 8))
+for i, (precision, recall) in enumerate(pr_curves):
+    plt.plot(recall, precision, label=f'{labels[i]} (AUC = {pr_aucs[i]:.2f})', color=colors[i], linewidth=2)
+
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('Recall', fontsize=18)
+plt.ylabel('Precision', fontsize=18)
+# plt.title('Precision-Recall Curves for Different Graph Representations', fontsize=16)
+plt.legend(loc='lower left', fontsize=12)
+plt.grid(True, linestyle='--', linewidth=0.5)
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+#%%#
+### Individual folds acc, FPR, and Precision #####################################################
+
+import matplotlib.pyplot as plt
+
+colors = ['navy', 'darkorange', 'green', 'red']
+
+###################### Acc for each fold for the graph representations
+accuracy_data = {
+    'Basic': [0.850974, 0.847889, 0.859649, 0.855408, 0.845961, 0.849431, 0.854444, 0.854058, 0.861963, 0.855601],
+    'Deck Assign': [0.854637, 0.852901, 0.842105, 0.853094, 0.858878, 0.855215, 0.776278, 0.848082, 0.869096, 0.860228],
+    'Deck Co-use': [0.832466, 0.814536, 0.816079, 0.811837, 0.812801, 0.809523, 0.812199, 0.818392, 0.813572, 0.822826],
+    'Hierarchical': [0.866397, 0.861926, 0.863312, 0.855408, 0.864276, 0.862541, 0.867746, 0.858492, 0.860806, 0.861191],
+}
+
+# Folds
+folds = list(range(1, 11))
+
+# Plotting Accuracy
+plt.figure(figsize=(10, 6))
+
+for i, (label, accuracies) in enumerate(accuracy_data.items()):
+    plt.plot(folds, accuracies, marker='o', label=label, color=colors[i])
+
+plt.ylim([0.725, 0.915])
+plt.xlabel('Folds', fontsize=18)
+plt.ylabel('Accuracy', fontsize=18)
+plt.legend(loc='lower left', fontsize=12)
+plt.grid(True)
+plt.show()
+
+
+###################### FPR data for each fold for the graph representations
+fpr_data = {
+    'Basic': [0.112779, 0.099391, 0.104758, 0.124905, 0.097532, 0.099726, 0.127349, 0.102033, 0.119420, 0.145685],
+    'Deck Assign': [0.161278, 0.133283, 0.166538, 0.141609, 0.140227, 0.149784, 0.565074, 0.171078, 0.129721, 0.144893],
+    'Deck Co-use': [0.141262, 0.143945, 0.164620, 0.168565, 0.171171, 0.151704, 0.173863, 0.154202, 0.161770, 0.152415],
+    'Hierarchical': [0.147421, 0.160700, 0.149270, 0.135915, 0.161770, 0.132963, 0.154583, 0.147297, 0.143457, 0.123911],
+}
+
+# Plotting FPR
+plt.figure(figsize=(10, 6))
+
+for i, (label, fprs) in enumerate(fpr_data.items()):
+    plt.plot(folds, fprs, marker='o', label=label, color=colors[i])
+
+plt.ylim([0, 0.6])
+plt.xlabel('Folds', fontsize=18)
+plt.ylabel('FPR', fontsize=18)
+plt.legend(loc='best', fontsize=12)
+plt.grid(True)
+plt.show()
+
+
+###################### Precision data for each fold for the graph representations
+precision_data = {
+    'Basic': [0.878018, 0.886225, 0.886202, 0.866315, 0.893207, 0.891903, 0.866613, 0.887049, 0.873586, 0.861027],
+    'Deck Assign': [0.843247, 0.859888, 0.834981, 0.852976, 0.863254, 0.855199, 0.865648, 0.833831, 0.867549, 0.862819],
+    'Deck Co-use': [0.850448, 0.839490, 0.827364, 0.819878, 0.827749, 0.839536, 0.819013, 0.835381, 0.826726, 0.846736],
+    'Hierarchical': [0.856132, 0.843064, 0.853207, 0.857880, 0.850145, 0.860977, 0.850740, 0.853097, 0.855162, 0.878068],
+}
+
+# Plotting Precision
+plt.figure(figsize=(10, 6))
+
+for i, (label, precisions) in enumerate(precision_data.items()):
+    plt.plot(folds, precisions, marker='o', label=label, color=colors[i])
+
+plt.ylim([0.775, 0.95])
+plt.xlabel('Folds', fontsize=18)
+plt.ylabel('Precision', fontsize=18)
+plt.legend(loc='best', fontsize=12)
+plt.grid(True)
+plt.show()
+
+
+
+######################## F1 Score data for each fold for the graph representations
+
+f1_data = {
+    'Basic': [0.845121218,	0.837487127,	0.853815261,	0.850418827,	0.839138313,	0.843455602,	0.851055435,	0.846605876,	0.85799286,	0.858918817],
+    'Deck Assign': [0.856708476,	0.84917968,	0.84283247, 0.850294695, 0.860624524, 0.857630332, 0.861094876,	0.850303951, 0.867718683, 0.863951961],
+    'Deck Co-use': [0.827681935,	0.804312449,	0.811685748,	0.805500199,	0.812222007,	0.804278922,	0.808402042,	0.812425329,	0.807101536,	0.822346801],
+    'Hierarchical': [0.868025138,	0.863619048,	0.864461862,	0.852129338,	0.869387755,	0.863592883,	0.870075758,	0.858683096,	0.860131732,	0.862280031]
+}
+
+# Plotting F1 Score
+plt.figure(figsize=(10, 6))
+
+for i, (label, f1s) in enumerate(f1_data.items()):
+    plt.plot(folds, f1s, marker='o', label=label, color=colors[i])
+
+plt.ylim([0.775, 0.9])
+plt.xlabel('Folds', fontsize=18)
+plt.ylabel('F1 Score', fontsize=18)
+plt.legend(loc='best', fontsize=12)
+plt.grid(True)
+plt.show()
+
+
+
+
+
+### ---------------------------------------------------------------------------------------------
+
+
+#%%#
+### Processing time for the graph representations ################################################
+
+## Load the data
+df = pd.read_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v5_HEAT_att_late.xlsx')
+
+
+plt.style.use('_mpl-gallery')
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+# Increase font size for the boxplot
+ax.boxplot([df['v2'], df['v3_3'], df['v3_4'], df['v5']], showmeans=True, patch_artist=True, 
+           boxprops=dict(facecolor='lightblue', color='navy'), 
+           medianprops=dict(color='navy'), 
+           meanprops=dict(marker='o', markerfacecolor='darkorange', markeredgecolor='black'))
+
+# Calculate and annotate means
+means = [df['v2'].mean(), df['v3_3'].mean(), df['v3_4'].mean(), df['v5'].mean()]
+for i, mean in enumerate(means, start=1):
+    ax.text(i + 0.0235, mean + 0.02, f'{mean:.4f}', ha='left', va='bottom', fontsize=13, color='black')  # Increased fontsize
+
+# Set axis labels and title with increased font sizes
+ax.set_xticks([1, 2, 3, 4])
+ax.set_xticklabels(['Basic', 'Deck Assign', 'Deck Co-use', 'Hierarchical'], fontsize=18)  # Increased fontsize
+# ax.set_title('Distribution of Total Processing Time for Each Graph Representation', fontsize=18, fontweight='bold')  # Increased fontsize
+ax.set_ylabel('Processing Time (seconds)', fontsize=18)  # Increased fontsize
+
+# Increase font size for tick labels
+ax.tick_params(axis='x', labelsize=14)
+ax.tick_params(axis='y', labelsize=14)
+ax.set_ylim([0, 0.6])
+
+plt.show()
+
+
+
+
+### ---------------------------------------------------------------------------------------------
+
+
+## Load the data
+df = pd.read_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v5.xlsx')
+
+
+plt.style.use('_mpl-gallery')
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+# Increase font size for the boxplot
+ax.boxplot([df['v2'], df['v3_3'], df['v3_4'], df['v5']], showmeans=True, patch_artist=True, 
+           boxprops=dict(facecolor='lightblue', color='navy'), 
+           medianprops=dict(color='navy'), 
+           meanprops=dict(marker='o', markerfacecolor='darkorange', markeredgecolor='black'))
+
+# Calculate and annotate means
+means = [df['v2'].mean(), df['v3_3'].mean(), df['v3_4'].mean(), df['v5'].mean()]
+for i, mean in enumerate(means, start=1):
+    ax.text(i + 0.0235, mean + 0.01, f'{mean:.4f}', ha='left', va='bottom', fontsize=13, color='black')  # Increased fontsize
+
+# Set axis labels and title with increased font sizes
+ax.set_xticks([1, 2, 3, 4])
+ax.set_xticklabels(['Basic', 'Deck Assign', 'Deck Co-use', 'Hierarchical'], fontsize=18)  # Increased fontsize
+# ax.set_title('Distribution of Total Processing Time for Each Graph Representation', fontsize=18, fontweight='bold')  # Increased fontsize
+ax.set_ylabel('Processing Time (seconds)', fontsize=18)  # Increased fontsize
+
+# Increase font size for tick labels
+ax.tick_params(axis='x', labelsize=14)
+ax.tick_params(axis='y', labelsize=14)
+ax.set_ylim([0, 0.05])
+
+plt.show()
+
+
 
 
 

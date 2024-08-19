@@ -200,6 +200,26 @@ def edge_att_extractor(G):
             edge_features.append([1, 0, 0, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'via':
             edge_features.append([0, 1, 0, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'load via': ## v5, v3_4=load via, v3_3=load !!!!!!
+            edge_features.append([0, 0, 1, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'unload':
+            edge_features.append([0, 0, 0, 1, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'applicable':
+            edge_features.append([0, 0, 0, 0, 1])
+
+    edge_features = torch.tensor(edge_features, dtype=torch.float32)
+    return edge_features
+
+
+def edge_att_extractor_v3(G):
+    ## For attribute in edge, 'action' doing one-hot encoding, there are 'next', 'via', 'load', 'unload', 'applicable'
+    ## Build a tensor matrix for the edge feature, store the one-hot encoding for each edge
+    edge_features = []
+    for edge in range(len(edge_extract(G))):
+        if edge_extract(G)[edge][2]['action'] == 'next':
+            edge_features.append([1, 0, 0, 0, 0])
+        elif edge_extract(G)[edge][2]['action'] == 'via':
+            edge_features.append([0, 1, 0, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'load': ## v5, v3_4=load via, v3_3=load !!!!!!
             edge_features.append([0, 0, 1, 0, 0])
         elif edge_extract(G)[edge][2]['action'] == 'unload':
@@ -469,7 +489,8 @@ if __name__ == '__main__':
         node_features = node_feature_raw_v2(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
-        ## TODO: v2: ewe_v2
+        ## TODO: v2: eae_v2
+        ## TODO: v3: eae_v3
         edge_att = edge_att_extractor_v2(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
@@ -486,7 +507,8 @@ if __name__ == '__main__':
         node_features = node_feature_raw_v2(graph)
         edge_dd = edge_index_extractor(graph)
         edge_we = edge_weight_extractor(graph)
-        ## TODO: v2: ewe_v2
+        ## TODO: v3: eae_v3
+        ## TODO: v2: eae_v2
         edge_att = edge_att_extractor_v2(graph)
         edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
 
