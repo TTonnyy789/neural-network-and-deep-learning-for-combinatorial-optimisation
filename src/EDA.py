@@ -113,11 +113,21 @@ for file in os.listdir(feasible_data_dir):
         feasible_graphs_v2.append(data)
 
 ## Raw json data
+# infeasible_graphs_v2 = []
+# for file in os.listdir(infeasible_data_dir):
+#     ## Select the file with json format and file name do not contain solution
+#     if file.endswith('.json'):
+#         data = read_json_file(os.path.join(infeasible_data_dir, file))
+#         # G = json_to_graph_v5(data)
+#         infeasible_graphs_v2.append(data)
+
+
+## Raw json data
 infeasible_graphs_v2 = []
-for file in os.listdir(infeasible_data_dir):
+for file in os.listdir(infeasible_data_dir_2):
     ## Select the file with json format and file name do not contain solution
     if file.endswith('.json'):
-        data = read_json_file(os.path.join(infeasible_data_dir, file))
+        data = read_json_file(os.path.join(infeasible_data_dir_2, file))
         # G = json_to_graph_v5(data)
         infeasible_graphs_v2.append(data)
 
@@ -162,12 +172,19 @@ for i in range(len(feasible_graphs_v2)):
 
 
 
+
+# infeasible_graphs = []
+# for i in range(len(selected_infeasible_graphs)):
+#     data = json_to_graph_v5_weight(selected_infeasible_graphs[i])
+#     infeasible_graphs.append(data)
+
+
 infeasible_graphs = []
-for i in range(len(selected_infeasible_graphs)):
-    data = json_to_graph_v5_weight(selected_infeasible_graphs[i])
+## Random select 25935 files from those files
+random_files = np.random.choice(infeasible_graphs_v2, 25935, replace=False)
+for i in range(len(random_files)):
+    data = json_to_graph_v5_weight(random_files[i])
     infeasible_graphs.append(data)
-
-
 
 
 
@@ -723,7 +740,7 @@ file_names = [
 ]
 
 labels = ['Basic', 'Deck Assign', 'Deck Co-use', 'Hierarchical']  # Adjust these labels as needed
-colors = ['navy', 'darkorange', 'green', 'red']  # Define different colors for the lines
+colors = ['Teal', 'darkorange', 'lightblue', 'pink']  # Define different colors for the lines
 
 # Initialize lists to store data for plotting
 roc_curves = []
@@ -791,6 +808,7 @@ plt.show()
 ### Individual folds acc, FPR, and Precision #####################################################
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 colors = ['navy', 'darkorange', 'green', 'red']
 
@@ -802,21 +820,37 @@ accuracy_data = {
     'Hierarchical': [0.866397, 0.861926, 0.863312, 0.855408, 0.864276, 0.862541, 0.867746, 0.858492, 0.860806, 0.861191],
 }
 
-# Folds
-folds = list(range(1, 11))
+# Convert the dictionary to a DataFrame for easy plotting with Seaborn
+df = pd.DataFrame(accuracy_data)
 
-# Plotting Accuracy
+# Set the plot style
+sns.set(style="whitegrid")
+
+# Create a box plot
 plt.figure(figsize=(10, 6))
+sns.boxplot(data=df, palette="Set2", showmeans=False)
 
-for i, (label, accuracies) in enumerate(accuracy_data.items()):
-    plt.plot(folds, accuracies, marker='o', label=label, color=colors[i])
+# Add data points
+sns.stripplot(data=df, palette="Set2", jitter=False, size=8, linewidth=1, edgecolor='gray')
 
-plt.ylim([0.725, 0.915])
-plt.xlabel('Folds', fontsize=18)
+# Set labels and title with increased font sizes
+# plt.xlabel('Graph Representation', fontsize=18)
 plt.ylabel('Accuracy', fontsize=18)
-plt.legend(loc='lower left', fontsize=12)
-plt.grid(True)
+plt.title('Variance of Accuracy across Folds for Different Graph Representations', fontsize=16)
+
+# Adjust y-axis limits
+plt.ylim([0.725, 0.915])
+
+# Customize x-tick labels
+plt.xticks(ticks=range(len(df.columns)), labels=df.columns, fontsize=14)
+
+# Show the plot
 plt.show()
+
+
+
+
+
 
 
 ###################### FPR data for each fold for the graph representations
@@ -827,18 +861,37 @@ fpr_data = {
     'Hierarchical': [0.147421, 0.160700, 0.149270, 0.135915, 0.161770, 0.132963, 0.154583, 0.147297, 0.143457, 0.123911],
 }
 
-# Plotting FPR
+# Convert the dictionary to a DataFrame for easy plotting with Seaborn
+df_fpr = pd.DataFrame(fpr_data)
+
+# Set the plot style
+sns.set(style="whitegrid")
+
+# Create a box plot
 plt.figure(figsize=(10, 6))
+sns.boxplot(data=df_fpr, palette="Set2", showmeans=False)
 
-for i, (label, fprs) in enumerate(fpr_data.items()):
-    plt.plot(folds, fprs, marker='o', label=label, color=colors[i])
+# Add data points
+sns.stripplot(data=df_fpr, palette="Set2", jitter=False, size=8, linewidth=1, edgecolor='gray')
 
-plt.ylim([0, 0.6])
-plt.xlabel('Folds', fontsize=18)
+# Set labels and title with increased font sizes
+# plt.xlabel('Graph Representation', fontsize=18)
 plt.ylabel('FPR', fontsize=18)
-plt.legend(loc='best', fontsize=12)
-plt.grid(True)
+plt.title('Variance in FPR Across Folds for Different Graph Representations', fontsize=16)
+
+# Adjust y-axis limits
+plt.ylim([0, 0.6])
+
+# Customize x-tick labels
+plt.xticks(ticks=range(len(df.columns)), labels=df.columns, fontsize=14)
+
+# Show the plot
 plt.show()
+
+
+
+
+
 
 
 ###################### Precision data for each fold for the graph representations
@@ -849,18 +902,37 @@ precision_data = {
     'Hierarchical': [0.856132, 0.843064, 0.853207, 0.857880, 0.850145, 0.860977, 0.850740, 0.853097, 0.855162, 0.878068],
 }
 
-# Plotting Precision
+# Convert the dictionary to a DataFrame for easy plotting with Seaborn
+df_precision_data = pd.DataFrame(precision_data)
+
+# Set the plot style
+sns.set(style="whitegrid")
+
+# Create a box plot
 plt.figure(figsize=(10, 6))
+sns.boxplot(data=df_precision_data, palette="Set2", showmeans=False)
 
-for i, (label, precisions) in enumerate(precision_data.items()):
-    plt.plot(folds, precisions, marker='o', label=label, color=colors[i])
+# Add data points
+sns.stripplot(data=df_precision_data, palette="Set2", jitter=False, size=8, linewidth=1, edgecolor='gray')
 
-plt.ylim([0.775, 0.95])
-plt.xlabel('Folds', fontsize=18)
+# Set labels and title with increased font sizes
+# plt.xlabel('Graph Representation', fontsize=18)
 plt.ylabel('Precision', fontsize=18)
-plt.legend(loc='best', fontsize=12)
-plt.grid(True)
+plt.title('Variance in Precision Across Folds for Different Graph Representations', fontsize=16)
+
+# Adjust y-axis limits
+plt.ylim([0.775, 0.95])
+
+# Customize x-tick labels
+plt.xticks(ticks=range(len(df.columns)), labels=df.columns, fontsize=14)
+
+# Show the plot
 plt.show()
+
+
+
+
+
 
 
 
@@ -873,19 +945,32 @@ f1_data = {
     'Hierarchical': [0.868025138,	0.863619048,	0.864461862,	0.852129338,	0.869387755,	0.863592883,	0.870075758,	0.858683096,	0.860131732,	0.862280031]
 }
 
-# Plotting F1 Score
+# Convert the dictionary to a DataFrame for easy plotting with Seaborn
+df_f1_data = pd.DataFrame(f1_data)
+
+# Set the plot style
+sns.set(style="whitegrid")
+
+# Create a box plot
 plt.figure(figsize=(10, 6))
+sns.boxplot(data=df_f1_data, palette="Set2", showmeans=False)
 
-for i, (label, f1s) in enumerate(f1_data.items()):
-    plt.plot(folds, f1s, marker='o', label=label, color=colors[i])
+# Add data points
+sns.stripplot(data=df_f1_data, palette="Set2", jitter=False, size=8, linewidth=1, edgecolor='gray')
 
-plt.ylim([0.775, 0.9])
-plt.xlabel('Folds', fontsize=18)
+# Set labels and title with increased font sizes
+# plt.xlabel('Graph Representation', fontsize=18)
 plt.ylabel('F1 Score', fontsize=18)
-plt.legend(loc='best', fontsize=12)
-plt.grid(True)
-plt.show()
+plt.title('Variance in F1 Score Across Folds for Different Graph Representations', fontsize=16)
 
+# Adjust y-axis limits
+plt.ylim([0.775, 0.9])
+
+# Customize x-tick labels
+plt.xticks(ticks=range(len(df.columns)), labels=df.columns, fontsize=14)
+
+# Show the plot
+plt.show()
 
 
 
@@ -900,7 +985,7 @@ plt.show()
 df = pd.read_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v5_HEAT_att_late.xlsx')
 
 
-plt.style.use('_mpl-gallery')
+plt.style.use('white')
 fig, ax = plt.subplots(1, 1, figsize=(10, 10))
 
 # Increase font size for the boxplot

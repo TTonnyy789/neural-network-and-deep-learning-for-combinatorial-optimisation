@@ -2157,20 +2157,20 @@ plt.show()
 
 feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/feasible'
 
-infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/soft'
 
 # infeasible_data_dir_12 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/100K_instances/soft'
 
 
 ## Load the time testing data, excluding the soft infeasible instances
-soft_infeasible = pd.read_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible/soft_solution.xlsx')
+# soft_infeasible = pd.read_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible/soft_solution.xlsx')
 
 
-soft_infeasible_instances = []
+# soft_infeasible_instances = []
 
-## Add the first columns in the list
-for i in range(soft_infeasible.shape[0]):
-    soft_infeasible_instances.append(soft_infeasible.iloc[i, 0])
+# ## Add the first columns in the list
+# for i in range(soft_infeasible.shape[0]):
+#     soft_infeasible_instances.append(soft_infeasible.iloc[i, 0])
 
 
 ### ---------------------------------------------------------------------------
@@ -2180,6 +2180,8 @@ for i in range(soft_infeasible.shape[0]):
 ### Time testing for feasible instances ########################################
 
 ## Load the model using torch
+## TODO: Remember to change the model for the testing measuring time
+
 model = torch.load('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/models/v5_HEAT_att_late.pth', map_location=torch.device('cpu'))
 
 ## Summary of the model
@@ -2191,17 +2193,20 @@ processing_times = []
 output = []
 
 ## Select the infeasible instances excluding the soft infeasible instances, select those file with json file name, and 'solution' not in file name
-infeasible_graphs = []
+feasible_instances = []
+for file in os.listdir(feasible_data_dir):
+    if file.endswith('.json') and 'solution' not in file:
+        feasible_instances.append(file)
+
+
+infeasible_instances = []
 for file in os.listdir(infeasible_data_dir):
     if file.endswith('.json') and 'solution' not in file:
-        infeasible_graphs.append(file)
+        infeasible_instances.append(file)
 
 
-## Exclude the soft infeasible instances from the infeasible instances
-infeasible_instances = [i for i in infeasible_graphs if i not in soft_infeasible_instances]
 
-
-test_100 = infeasible_instances[:15000]
+test = feasible_instances + infeasible_instances
 
 y0 = torch.tensor([0], dtype=torch.long)
 
@@ -2209,13 +2214,21 @@ y0 = torch.tensor([0], dtype=torch.long)
 ## TODO: Before test on v3_3, remember to change the 'load via' into 'load' in the edge_att_extractor function !!!!! Verse versa for v3_4, and v5
 
 processing_times = []
-output = []
+processing_times_inference = []
 
-for i in test_100:
+
+for i in test:
 
     
-    json_data = read_json_file(os.path.join(infeasible_data_dir, i))
+    ## IF the the json file is feasible then use feasible_data_dir, else use infeasible_data_dir
+    if i in feasible_instances:
+        json_file = os.path.join(feasible_data_dir, i)
+    else:
+        json_file = os.path.join(infeasible_data_dir, i)
 
+    json_data = read_json_file(json_file)
+
+    start_time = time.time()
     graph = json_to_graph_v5_weight(json_data)
 
     ## TODO: v2: node_feature_raw_v2
@@ -2241,19 +2254,22 @@ for i in test_100:
     data = Data(x=node_features, edge_index=edge_dd, y=y0, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature, node_type=node_type, edge_type=edge_type)
     
     try:
-        start_time = time.time()
+        start_time_inference = time.time()
         out = model(data)
-        end_time = time.time()
         pred = out.argmax(dim=1)
+        end_time = time.time()
+
     except Exception as e:
         print(f"Error during model forward pass: {e}")
         continue
 
 
-    output.append(pred)
-
+    # output.append(pred)
+    processing_time_inference = end_time - start_time_inference
     processing_time = end_time - start_time
+
     processing_times.append(processing_time)
+    processing_times_inference.append(processing_time_inference)
 
 
 ## Vilsualise the distribution of prediction times 
@@ -2264,13 +2280,6 @@ plt.title('Distribution of Pre-processing + Prediction Times per Input', fontsiz
 plt.show()
 
 
-## Calculate the output accuracy
-output = torch.tensor(output)
-output = output.flatten()
-output = output.numpy()
-
-output_accuracy = np.sum(output == 0) / len(output)
-print(f'Output Accuracy: {output_accuracy:.4f}')
 
 ### ---------------------------------------------------------------------------
 
@@ -2285,19 +2294,25 @@ print(f'Output Accuracy: {output_accuracy:.4f}')
 
 ## Store all processing times and plot the distribution
 processing_times = np.array(processing_times)
-processing_times_1 = processing_times[output != 0]
+# processing_times_1 = processing_times[output != 0]
 
 plt.style.use('_mpl-gallery')
 plt.figure()
-sns.boxplot(x=processing_times_1, color='darkorange')
+sns.boxplot(x=processing_times, color='darkorange')
 plt.xlabel('Prediction Time (seconds)')
 plt.title('Distribution of Pre-processing + Prediction Times per Input')
 plt.show()
 
 ## Save the processing times using this current model across all infeasible instances(unseen) as Excel file
-df = pd.DataFrame(processing_times)
-df.to_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v2_HEAT_att_late.xlsx')
 
+## Total processing times
+df = pd.DataFrame(processing_times)
+df.to_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v5_total.xlsx')
+
+
+## Processing times for infeasible instances
+df_1 = pd.DataFrame(processing_times_inference)
+df_1.to_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/processing_time/processing_times_v5_inference.xlsx')
 
 ### ---------------------------------------------------------------------------
 
