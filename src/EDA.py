@@ -254,6 +254,93 @@ for file in os.listdir(feasible_data_dir):
 
 
 #%%#
+### Extract the dataset's features from pt file ####################################
+
+## Load the dataset
+dataset = torch.load('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/processed/v5_dataset.pt')
+
+dataset_training = dataset[:46683]
+
+training_stops = []
+training_vehicles = []
+
+for i in range(len(dataset_training)):
+    graph_stops = []
+    graph_vehicles = []
+    for j in range(len(dataset_training[i].x)):
+        if dataset_training[i].x[j][0] == 1:
+            graph_stops.append(dataset_training[i].x[j])
+        elif dataset_training[i].x[j][1] == 1:
+            graph_vehicles.append(dataset_training[i].x[j])
+    training_stops.append(len(graph_stops))
+    training_vehicles.append(len(graph_vehicles))
+
+
+
+
+dataset_test = dataset[46683:51870] 
+
+test_stops = []
+test_vehicles = []
+
+for i in range(len(dataset_test)):
+    graph_stops = []
+    graph_vehicles = []
+    for j in range(len(dataset_test[i].x)):
+        if dataset_test[i].x[j][0] == 1:
+            graph_stops.append(dataset_test[i].x[j])
+        elif dataset_test[i].x[j][1] == 1:
+            graph_vehicles.append(dataset_test[i].x[j])
+    test_stops.append(len(graph_stops))
+    test_vehicles.append(len(graph_vehicles))
+
+
+
+## PLot the distribution of the number of stops and vehicles for training and test dataset as an comparison using violin plot
+
+plt.style.use('_mpl-gallery')
+fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+
+positions = [1, 1.5, 3, 3.5]
+
+vp = ax.violinplot([training_stops, test_stops, training_vehicles, test_vehicles], showmeans=True, showmedians=True, positions=positions)
+
+colors = ['navy', 'darkorange', 'navy', 'darkorange']
+for i in range(len(vp['bodies'])):
+    vp['bodies'][i].set_facecolor(colors[i])
+    vp['bodies'][i].set_edgecolor('black')
+    vp['bodies'][i].set_alpha(0.7)
+
+for partname in ('cbars','cmins','cmaxes'):
+    vp[partname].set_edgecolor('black')
+    vp[partname].set_linewidth(1)
+
+ax.set_xticks([1.25, 3.25])
+ax.set_xticklabels(['Number of Stops', 'Number of Vehicles'])
+# ax.set_title('Distribution of the Number of Stops and Vehicles', fontsize=20, fontweight='bold')
+ax.set_ylabel('Count', fontsize=20)
+
+ax.tick_params(axis='x', labelsize=18)
+ax.tick_params(axis='y', labelsize=12)
+
+# Add the legend
+custom_lines = [plt.Line2D([0], [0], color='navy', lw=4),
+                plt.Line2D([0], [0], color='darkorange', lw=4)]
+ax.legend(custom_lines, ['Training Dataset', 'Test Dataset'], loc='upper right', fontsize=12)
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+#%%#
 ### Step-3 ######################################################################
 ### Visualize the distribution of the number of nodes and edges across the dataset
 
