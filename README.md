@@ -91,6 +91,46 @@ in PyTorch Geometric.
 
 ---
 
+## Dataset Analysis
+
+The training dataset contains 1M problem instances (feasible + soft-infeasible).
+Infeasible instances are selected by **greedy nearest-neighbour matching** in
+standardised feature space so that the two classes share the same structural
+distribution — preventing the model from exploiting trivial size differences.
+
+### Graph structure: nodes and edges
+
+Feasible and soft-infeasible instances have very similar node/edge count
+distributions, confirming that size alone cannot distinguish the two classes.
+
+![Node and edge count distributions](PIC2/EDA/%23_node_edges.png)
+
+### Stop and vehicle count: random vs. stratified sampling
+
+Random sampling (left) leaves a distributional gap in vehicle count between the
+two classes. Nearest-neighbour stratified sampling (right) closes that gap,
+forcing the GNN to learn structural feasibility rather than a size shortcut.
+
+| Random sampling | Stratified (nearest-neighbour) sampling |
+|:---:|:---:|
+| ![Random sampling](PIC2/EDA/random_sampling.png) | ![Stratified sampling](PIC2/EDA/stratified_sampling.png) |
+
+### Vehicle stay duration on deck
+
+Infeasible instances tend to have a slightly longer average stay per vehicle
+(more stops on deck), reflecting tighter packing that strains deck-access constraints.
+
+![Vehicle distance stats](PIC2/EDA/std.png)
+
+### Unloading edge count
+
+The number of unloading events is comparable between feasible and infeasible
+instances, confirming that global trip structure is not the distinguishing signal.
+
+![Unloading edge counts](PIC2/EDA/%23_unloading.png)
+
+---
+
 ## Results
 
 Best configuration: **HEATConv + attentional pooling + Hierarchical (v5) graph**,
@@ -102,6 +142,28 @@ trained on balanced 1M-instance dataset (feasible + soft-infeasible), 4-fold CV.
 | Hierarchical (v5) | **0.862** | 0.857 | **0.870** | **0.863** | 0.146 | 0.130 |
 
 ROC-AUC reaches **~0.93** for the Hierarchical graph.
+
+---
+
+## Processing Time
+
+End-to-end screening time was measured on 1M instances (pre-processing + inference).
+The Basic graph is fastest due to its smaller node/edge count; the Hierarchical graph
+trades speed for ~1% higher accuracy.
+
+### Inference time only (milliseconds)
+
+Basic mean: **5.78 ms** · Hierarchical mean: **9.92 ms**
+
+![Inference time comparison](PIC2/infernece.png)
+
+### Total time — pre-processing + inference (milliseconds)
+
+The Hierarchical graph's richer structure increases pre-processing cost
+(mean ~73 ms vs ~8 ms for Basic), but both remain orders of magnitude faster
+than invoking the combinatorial solver.
+
+![Total processing time comparison](PIC2/total.png)
 
 ---
 
