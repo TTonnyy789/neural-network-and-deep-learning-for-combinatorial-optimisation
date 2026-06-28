@@ -2290,6 +2290,129 @@ plt.show()
 
 
 #%%#
+### Testing the overall performance on the unseen infeasible instances ################
+
+## Load the model using torch
+model = torch.load('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/models/v5_HEAT_att_late.pth', map_location=torch.device('cpu'))
+
+## Summary of the model
+print(model)
+
+## Instances
+feasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/feasible'
+
+# infeasible_data_dir_2 = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/infeasible'
+
+infeasible_data_dir = '/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning-for-combinatorial-optimisation/data/1M_instances/soft'
+
+
+## Feasible instances
+feasible_graphs_v2 = []
+for file in os.listdir(feasible_data_dir):
+    ## Select the file with json format and file name do not contain solution
+    if file.endswith('.json') and 'solution' not in file:
+        data = read_json_file(os.path.join(feasible_data_dir, file))
+        # G = json_to_graph_v5(data)
+        feasible_graphs_v2.append(data)
+
+
+## Soft infeasible instances
+infeasible_graphs_v2 = []
+for file in os.listdir(infeasible_data_dir):
+    ## Select the file with json format and file name do not contain solution
+    if file.endswith('.json'):
+        data = read_json_file(os.path.join(infeasible_data_dir, file))
+        # G = json_to_graph_v5(data)
+        infeasible_graphs_v2.append(data)
+
+
+
+# Extract features
+feasible_features_list = [extract_json_features(graph) for graph in feasible_graphs_v2]
+infeasible_features_list = [extract_json_features(graph) for graph in infeasible_graphs_v2]
+
+# Convert lists to DataFrames
+feasible_features_df = pd.DataFrame(feasible_features_list)
+infeasible_features_df = pd.DataFrame(infeasible_features_list)
+
+# Standardize features
+scaler = StandardScaler()
+feasible_scaled_features = scaler.fit_transform(feasible_features_df)
+infeasible_scaled_features = scaler.transform(infeasible_features_df)
+
+# Select the most similar infeasible graphs to each feasible graph
+selected_infeasible_graphs = []
+remaining_infeasible_features = infeasible_scaled_features.copy()
+remaining_infeasible_graphs = infeasible_graphs_v2.copy()
+
+for feasible_feature in feasible_scaled_features:
+    distances = cdist([feasible_feature], remaining_infeasible_features, 'euclidean').flatten()
+    closest_idx = np.argmin(distances)
+    
+    # Select and remove the closest infeasible graph
+    selected_infeasible_graphs.append(remaining_infeasible_graphs.pop(closest_idx))
+    remaining_infeasible_features = np.delete(remaining_infeasible_features, closest_idx, axis=0)
+
+# Select 2610 infeasible graphs from the selected infeasible graphs
+selected_infeasible_graphs = np.random.choice(selected_infeasible_graphs, 25935, replace=False)
+selected_infeasible_graphs.tolist()
+
+
+## Create the a list to store the unselected infeasible instances
+unselected_infeasible_graphs = [graph for graph in infeasible_graphs_v2 if graph not in selected_infeasible_graphs]
+
+
+
+## Convert the unselected infeasible instances to graph data using v5
+infeasible_graphs = []
+for i in range(len(unselected_infeasible_graphs)):
+    data = json_to_graph_v5_weight(unselected_infeasible_graphs[i])
+    infeasible_graphs.append(data)
+
+
+## Test the model on the selected infeasible instances, which is direct to predict the output of these instances
+
+out_put = []
+
+
+for i in infeasible_graphs:
+    
+        node_features = node_feature_raw_v5(i)
+        edge_dd = edge_index_extractor(i)
+        edge_we = edge_weight_extractor(i)
+        edge_att = edge_att_extractor(i)
+    
+        node_type = torch.argmax(node_features[:, :3], dim=1)  
+        edge_type = torch.argmax(edge_att, dim=1) 
+    
+        edge_feature = torch.cat([edge_we.unsqueeze(1), edge_att], dim=1)
+    
+        data = Data(x=node_features, edge_index=edge_dd, edge_weight=edge_we, edge_attr=edge_att, edge_feature=edge_feature, node_type=node_type, edge_type=edge_type)
+        
+        try:
+            out = model(data)
+            pred = out.argmax(dim=1)
+            out_put.append(pred)
+    
+        except Exception as e:
+            print(f"Error during model forward pass: {e}")
+            continue
+
+
+## Test the accuracy of the output 
+output = [i for i in out_put if i != 0]
+accuracy = 1 - len(output) / len(out_put)
+print(f'Accuracy: {accuracy:.4f}')
+
+
+
+
+
+
+
+
+
+#%%#
 
 
 ## Store all processing times and plot the distribution
@@ -2318,3 +2441,5 @@ df_1.to_excel('/Users/ttonny0326/GitHub_Project/neural-network-and-deep-learning
 
 
 ##%%#
+
+# %%

@@ -1,0 +1,15 @@
+torch>=2.0.0
+torch-geometric>=2.3.0
+torch-scatter
+torch-sparse
+networkx>=3.0
+node2vec>=0.4.6
+karateclub>=1.3.3
+scikit-learn>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+scipy>=1.11.0
+tqdm>=4.65.0
+openpyxl>=3.1.0
