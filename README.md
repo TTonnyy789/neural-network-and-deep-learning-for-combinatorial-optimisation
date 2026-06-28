@@ -23,6 +23,8 @@ A loading plan is **feasible** if:
 Checking feasibility with a full solver is expensive. The GNN acts as a fast
 **pre-filter**: instances classified as infeasible skip the solver entirely.
 
+![Car transporter with three layered decks](PIC2/auto_carrier.png)
+
 ---
 
 ## Repository Structure
@@ -88,6 +90,8 @@ in PyTorch Geometric.
 **Pooling strategies**: global mean pooling (`_mean`) or attentional aggregation (`_att`).
 
 **Node feature variants**: raw hand-crafted features (`_raw`) or Node2Vec embeddings (`_n2v`).
+
+![Overall GNN framework: stacked message-passing layers → pooling → MLP classifier](PIC2/overall_framework.png)
 
 ---
 
