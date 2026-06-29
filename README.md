@@ -54,7 +54,7 @@ Checking feasibility with a full solver is expensive. The GNN acts as a fast
 
 ## Graph Representations
 
-Four ways to encode a CTLP instance as a graph were evaluated. Each adds richer
+Four ways to encode a ACLP instance as a graph were evaluated. Each adds richer
 structural information at the cost of larger graphs.
 
 | Name | Code | Nodes | Edge types |
@@ -292,10 +292,10 @@ python src/eda.py \
 
 - **HEATConv** is well-suited to this problem because it jointly embeds node types
   (stop / vehicle / deck) and edge types (next / load / via / applicable), allowing
-  the model to reason about the heterogeneous semantics of the CTLP graph.
+  the model to reason about the heterogeneous semantics of the ACLP graph.
 
 - **GraphNorm** (rather than BatchNorm) is used inside HEATConv layers because
-  CTLP graphs vary significantly in size, making batch normalisation unstable.
+  ACLP graphs vary significantly in size, making batch normalisation unstable.
 
 ---
 
