@@ -303,4 +303,4 @@ python src/eda.py \
 
 If you use this work, please cite:
 
-> Sheng-Yi Cheng. *Graph Neural Networks for Feasibility Screening in the Car Transporter Loading Problem*. MSc Dissertation, The University of Manchester, 2024.
+> Sheng-Yi Cheng. *How to load an auto carrier? Use deep graph neural networks to classify feasible problem instances*. MSc Dissertation, The University of Manchester, 2024.
