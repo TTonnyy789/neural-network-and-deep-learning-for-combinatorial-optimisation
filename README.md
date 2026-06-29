@@ -1,4 +1,4 @@
-# GNN Feasibility Screening for the Car Transporter Loading Problem
+# GNN Feasibility Screening for the Auto Carrier Loading Problem
 
 MSc dissertation project (The University of Manchester / Satalia, 2024).
 
@@ -12,18 +12,18 @@ and **~0.93 AUC** on held-out test data.
 
 ## The Problem
 
-A car transporter visits a sequence of stops. At each stop some vehicles are loaded
+A auto carrier visits a sequence of stops. At each stop some vehicles are loaded
 onto one of three layered decks (d1 / d2 / d3) and some vehicles are unloaded.
 A loading plan is **feasible** if:
 
 - deck capacity constraints are never violated at any stop, and
 - deck access constraints are respected (vehicles on higher decks cannot be removed
-  while vehicles below them are still on the transporter).
+  while vehicles below them are still on the auto carrier).
 
 Checking feasibility with a full solver is expensive. The GNN acts as a fast
 **pre-filter**: instances classified as infeasible skip the solver entirely.
 
-![Car transporter with three layered decks](PIC2/auto_carrier.png)
+![Auto carrier with three layered decks](PIC2/auto_carrier.png)
 
 ---
 
