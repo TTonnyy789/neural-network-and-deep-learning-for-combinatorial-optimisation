@@ -3,7 +3,7 @@
 MSc dissertation project (The University of Manchester / Satalia, 2024).
 
 This repository investigates using **Graph Neural Networks (GNNs)** to pre-screen
-instances of the **Car Transporter Loading Problem (CTLP)** for feasibility, before
+instances of the **Auto Carrier Loading Problem (ACLP)** for feasibility, before
 passing them to an expensive combinatorial optimisation solver. The best model
 (HEATConv + attentional pooling on the Hierarchical graph) achieves **~86% accuracy**
 and **~0.93 AUC** on held-out test data.
