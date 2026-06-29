@@ -1,6 +1,6 @@
 # GNN Feasibility Screening for the Car Transporter Loading Problem
 
-MSc dissertation project (University College London / Satalia, 2024).
+MSc dissertation project (The University of Manchester / Satalia, 2024).
 
 This repository investigates using **Graph Neural Networks (GNNs)** to pre-screen
 instances of the **Car Transporter Loading Problem (CTLP)** for feasibility, before
